@@ -1,0 +1,596 @@
+TEMP0  EQU  0
+TEMP1  EQU  1
+TEMP2  EQU  2
+TEMP3  EQU  3
+TEMP4  EQU  4
+TEMP5  EQU  5
+TEMP6  EQU  6
+TEMP7  EQU  7
+U      EQU  8
+SP     EQU  9
+W      EQU  10
+LINK   EQU  11
+CRU    EQU  12
+IP     EQU  13
+R      EQU  14
+NEXT   EQU  15
+*
+****************** this is the forth entry point **************
+*
+FF9995 MOV  @$U0(TEMP1),U
+       MOV  TEMP1,@$UCONS(U)
+       MOV  @$UCONS(U),TEMP1
+       MOV  @$S0(TEMP1),SP    STACK
+       MOV  @$R0(TEMP1),R     RETURN
+       MOV  @$U0(TEMP1),U     USERBASE
+       MOV  U,@$U0(U)
+       LI   IP,COLD+2
+       LI   NEXT,$NEXT
+       B    *NEXT
+*
+*===== USER VARIABLE NAMES=ADDRESSES =================
+* THIS WAS MODIFIED FROM TI-FORTH TO INCLUDE BOTH DICTIONARY
+* AND LOADER NAMES AS SINGLE COMPILE IS NOW DONE.
+*
+*
+       DORG 0
+UBASE  BSS  6             BASE OF USER VARIABLES
+$UCONS BSS  2             06 USER UCONS
+$S0    BSS  2             08 USER S0
+$R0    BSS  2             0A USER R0 { R0$
+$U0    BSS  2             0C USER U0
+       BSS  2             0E USER TIB
+       BSS  2             10 USER WIDTH
+       BSS  2             12 USER DP
+$SYS   BSS  2             14 USER SYS$
+CURPO$ BSS  2             16 USER CURPOS
+$INTLK BSS  2             18 USER INTLNK
+       BSS  2             1A USER WARNING
+       BSS  2             1C USER C/L$ { CL$
+       BSS  2             1E USER FIRST$
+       BSS  2             20 USER LIMIT$
+       BSS  2             22 USER B/BUF$ { BBUF$
+       BSS  2             24 USER B/SCR$ { BSCR$
+$DKFLO BSS  2             26 USER DISK_LO
+$DKFHI BSS  2             28 USER DISK_HI
+$DKSIZ BSS  2             2A USER DISK_SIZE
+$DKBUF BSS  2             2C USER DISK_BUF
+$PABS  BSS  2             2E USER PABS
+$SWDTH BSS  2             30 USER SCRN_WIDTH
+$SSTRT BSS  2             32 USER SCRN_START
+$SEND  BSS  2             34 USER SCRN_END
+$ISR   BSS  2             36 USER ISR
+$ALTI  BSS  2             38 USER ALTIN
+$ALTO  BSS  2             3A USER ALTOUT
+ULNGTH EQU  $
+       BSS  2             3C USER FENCE
+       BSS  2             3E USER BLK
+       BSS  2             40 USER IN
+$OUT   BSS  2             42 USER OUT
+       BSS  2             44 USER SCR
+$OFFST BSS  2             46 USER OFFSET
+       BSS  2             48 USER CONTEXT
+       BSS  2             4A USER CURRENT
+       BSS  2             4C USER STATE
+       BSS  2             4E USER BASE
+       BSS  2             50 USER DPL
+       BSS  2             52 USER FLD
+       BSS  2             54 USER CSP
+       BSS  2             56 USER R# { RNUM
+       BSS  2             58 USER HLD
+       BSS  2             5A USER USE
+       BSS  2             5C USER PREV
+       BSS  2             5E
+       BSS  2             60
+FORLNK BSS  2             62 USER FORTH_LINK
+       BSS  2             64 USER ECOUNT
+UMAX   BSS  0
+*
+       RORG
+*** INTERRUPT SERVICE (99/4A dependent code so we omitted ??)
+*
+INT1   RTWP
+*INT1   LI   TEMP1,INT2   FIX 'NEXT' SO THAT INTERRUPT IS
+*      MOV  TEMP1,@2*NEXT+MAINWS  PROCESSED AT END OF
+*      LWPI >83C0        NEXT 'CODE' WORD
+*      RTWP
+*
+* INT2   LIMI 0
+*      MOVB @>83D4,TEMP0
+*      SRL  TEMP0,8
+*      ORI  TEMP0,>100
+*      ANDI TEMP0,>FFDF
+*      BLWP @VWTR        TURN OFF VDP INTERRUPTS
+*      LI   NEXT,$NEXT   RESTORE 'NEXT'
+*      SETO @INTACT
+*      DECT R            SET UP RETURN LINKAGE
+*      MOV  IP,*R
+*      LI   IP,INT3
+*      MOV  @$ISR(U),W   DO THE FORTH ROUTINE
+*      B    @DOEXEC
+* INT3   DATA $+2
+*      DATA $+2
+*      MOV  *R+,IP
+*      CLR  @INTACT
+*      MOVB @>83D4,TEMP0
+*      SRL  TEMP0,8
+*      AI   TEMP0,>100
+*      MOVB @VDPSTA,TEMP1 REMOVE PENDING INTERRUPT
+*      BLWP @VWTR
+*      LIMI 2
+*      B    *NEXT        CONTINUE NORMAL TASK
+*================================================
+BKLINK MOV  @INTACT,TEMP7
+       JNE  BKLIN1
+       LIMI 2
+BKLIN1 B    *LINK
+*===========================================================
+*
+*      the syscalls that are to MDOS are done with interrupts
+*      enabled this seems to let Forth and MDOS get along better.
+*      we also removed the old utility calls with a protective
+*      return just in case some old code slipped through
+*
+$SYS$  CI   TEMP1,26
+       JGT  NORM
+       LIMI 0
+NORM   MOV  @SYSTAB(TEMP1),TEMP0
+       B    *TEMP0
+       DATA EXIT         CODE=-22 EXIT TO MDOS                 5/89(mjm)
+       DATA PDT          CODE=-20 PAB DATA ADDRESS TO STACK    5/89(mjm)
+       DATA DSK          CODE=-18 DRIVE SELECTION
+       DATA DSK          CODE=-16 READ DISK
+       DATA DSK          CODE=-14 WRITE DISK
+       DATA GXY          CODE=-12 GOTOXY
+       DATA QKY          CODE=-10 ?KEY
+       DATA QTM          CODE=-8  ?TERMINAL
+       DATA CLF          CODE=-6  CRLF
+       DATA EMT          CODE=-4  EMIT
+       DATA KY           CODE=-2  KEY
+SYSTAB DATA SBW          CODE=0   VSBW
+       DATA MBW          CODE=2   VMBW
+       DATA SBR          CODE=4   VSBR
+       DATA MBR          CODE=6   VMBR
+       DATA WTR          CODE=8   VWTR
+       DATA GPL          CODE=10  GPLLNK       (REMOVED)
+       DATA GPL          CODE=12  XMLLNK       (REMOVED)
+       DATA DSR          CODE=14  DSRLNK       (REMOVED)
+       DATA CLS          CODE=16  CLS
+       DATA DSR          CODE=18  FORMAT-DISK  (REMOVED)
+       DATA VFILL        CODE=20  VFILL
+       DATA AOX          CODE=22  VAND
+       DATA AOX          CODE=24  VOR
+       DATA AOX          CODE=26  VXOR
+*                                        ****new call #s 5/89 (mjm)
+       DATA KBU          CODE=28  KEYB
+       DATA VIU          CODE=30  VIDEO
+       DATA MEU          CODE=32  MEMRY
+       DATA IOU          CODE=34  DOIO
+       DATA UTU          CODE=36  UTIL
+       DATA MTU          CODE=38  MATH
+*
+**** Dead code calling 99/4A utilities goes here
+*
+DSR    MOV  *SP+,TEMP0
+GPL    B    @BKLINK
+*
+*
+********** UTILITY WORKSPACE VECTORS *************
+*
+VSBW   DATA UTILWS,VSBWEN     VDP single byte write
+VMBW   DATA UTILWS,VMBWEN     VDP multiple byte write
+VSBR   DATA UTILWS,VSBREN     VDP single byte read
+VMBR   DATA UTILWS,VMBREN     VDP multiple byte read
+VWTR   DATA UTILWS,VWTREN     VDP write to register
+KSCAN  DATA UTILWS,KSENTR     KSCAN UTILITY
+*
+*==============================================================
+*      VDP UTILITIES   ( from original ti code )
+*
+** VDP single byte write
+*
+VSBWEN BL   @WVDPWA          Write out address
+       MOVB @2(R13),@VDPWD   Write data
+       RTWP                  Return to calling program
+*
+** VDP multiple byte write
+*
+VMBWEN BL   @WVDPWA          Write out address
+VWTMOR MOVB *R1+,@VDPWD      Write a byte
+       DEC  R2               Decrement byte count
+       JH   VWTMOR           More to write?       (JH 5/89 mjm )
+       RTWP                  Return to calling Program
+*
+** VDP single byte read
+*
+VSBREN BL   @WVDPRA          Write out address
+       MOVB @VDPRD,@2(R13)   Read data
+       RTWP                  Return to calling program
+*
+** VDP multiple byte read
+*
+VMBREN BL   @WVDPRA          Write out address
+VRDMOR MOVB @VDPRD,*R1+      Read a byte
+       DEC  R2               Decrement byte count
+       JH   VRDMOR           More to read?        (JH 5/89 mjm )
+       RTWP                  Return to calling program
+*
+** VDP write to register
+*
+VWTREN MOV  *R13,R1          Get register number and value
+       MOVB @1(R13),@VDPWA   Write out value
+       ORI  R1,>8000         Set for register write
+       MOVB R1,@VDPWA        Write out register number
+       RTWP                  Return to calling program
+*
+** Set up to write to VDP
+*
+WVDPWA LI   R1,>4000
+       JMP  WVDPAD
+*
+** Set up to read VDP
+*
+WVDPRA CLR  R1
+*
+** Write VDP address
+*
+WVDPAD MOV  *R13,R2          Get VDP address
+       SWPB R2
+       MOVB R2,@VDPWA     Write low byte of address
+       SWPB R2
+       SOC  R1,R2            Properly adjust VDP write bit
+       MOVB R2,@VDPWA        Write high byte of address
+       MOV  @2(R13),R1       Get CPU RAM address
+       MOV  @4(R13),R2       Get byte count
+       RT                    Return to calling routine
+*
+*== THIS IS A VDP SINGLE BYTE WRITE.  CODE=0  ==============
+*
+SBW    MOV  *SP+,TEMP0   VDP ADDRESS (DESTINATION)
+       MOV  *SP+,TEMP1   CHARACTER TO WRITE
+       SWPB TEMP1        GET IN LEFT BYTE
+       BLWP @VSBW
+       B    @BKLINK
+*
+*== THIS IS A VDP MULTI BYTE WRITE.  CODE=2   ==============
+*
+MBW    MOV  *SP+,TEMP2   NUMBER OF BYTE TO MOVE
+       MOV  *SP+,TEMP0   VDP ADDRESS (DESTINATION)
+       MOV  *SP+,TEMP1   RAM ADDRESS (SOURCE)
+       BLWP @VMBW
+       B    @BKLINK
+*
+*== THIS IS A VDP SINGLE BYTE READ.  CODE=4   ==============
+*
+SBR    MOV  *SP,TEMP0    VDP ADDRESS (SOURCE)
+       BLWP @VSBR
+       SRL  TEMP1,8      CHARACTER TO RIGHT HALF FOR FORTH
+       MOV  TEMP1,*SP    STACK IT
+       B    @BKLINK
+*
+*== THIS IS A VDP MULTI BYTE READ.  CODE=6    ==============
+*
+MBR    MOV  *SP+,TEMP2   NUMBER OF BYTES TO READ
+       MOV  *SP+,TEMP1   RAM ADDRESS (DESTINATION)
+       MOV  *SP+,TEMP0   VDP ADDRESS (SOURCE)
+       BLWP @VMBR
+       B    @BKLINK
+*
+*== VDP REGISTER WRITE.  CODE=8               ==============
+*
+WTR    MOV  *SP+,TEMP1   VDP REGISTER NUMBER
+       MOV  *SP+,TEMP0   DATA FOR REGISTER
+       SWPB TEMP1        GET REGISTER TO LEFT BYTE
+       MOVB TEMP1,TEMP0  PLACE WITH DATA
+       BLWP @VWTR
+       B    @BKLINK
+*
+*== THIS IS THE SCREEN CLEARING UTILITY.  CODE=16 ==========
+*
+CLS    MOV  @$SSTRT(U),TEMP2     BEGINNING OF SCREEN IN VDP
+       MOV  @$SEND(U),TEMP1      END OF SCREEN IN VDP
+       S    TEMP2,TEMP1       SCREEN SIZE
+       LI   TEMP0,>2000       BLANK CHARACTER
+       MOV  LINK,TEMP7
+       BL   @FILL1
+       MOV  TEMP7,LINK
+       B    @BKLINK
+*
+*== THIS IS THE VDP FILL ROUTINE.  CODE=20
+*
+VFILL  MOV  *SP+,TEMP0   FILL CHARACTER
+       SWPB TEMP0        TO LEFT BYTE
+       MOV  *SP+,TEMP1   FILL COUNT
+       MOV  *SP+,TEMP2   ADDRESS TO START VDP FILL
+       MOV  LINK,TEMP7
+       BL   @FILL1
+       MOV  TEMP7,LINK
+       B    @BKLINK
+*===========================================================
+FILL1  ORI  TEMP2,>4000  SET BIT FOR VDP WRITE
+       SWPB TEMP2
+       MOVB TEMP2,@VDPWA LS BYTE FIRST
+       SWPB TEMP2
+       MOVB TEMP2,@VDPWA THEN MS BYTE
+       NOP               KILL TIME
+FLOOP  MOVB TEMP0,@VDPWD WRITE A BYTE
+       DEC  TEMP1
+       JNE  FLOOP        NOT DONE, FILL ANOTHER
+       B    *LINK
+*===========================================================
+*
+*== VDP BYTE 'AND' 'OR' 'XOR' ROUTINES.  CODE=22,24,26   ===
+*
+AOX    MOV  *SP+,TEMP2   VDP ADDRESS
+       SWPB TEMP2
+       MOVB TEMP2,@VDPWA LS BYTE FIRST
+       SWPB TEMP2
+       MOVB TEMP2,@VDPWA THEN MS BYTE
+       NOP               KILL TIME
+       MOVB @VDPRD,TEMP3 READ BYTE
+       MOV  *SP+,TEMP0   GET DATA TO OPERATE WITH
+       SWPB TEMP0        TO LEFT BYTE
+*** NOW DO REQUESTED OPERATION *****************
+       CI   TEMP1,24
+       JEQ  DOOR
+       JGT  DOXOR
+       INV  TEMP3        THESE TWO INSTRUCTIONS
+       SZC  TEMP3,TEMP0  PERFORM AN 'AND'
+       JMP  FINAOX
+DOOR   SOC  TEMP3,TEMP0  PERFORM OR
+       JMP  FINAOX
+DOXOR  XOR  TEMP3,TEMP0  PERFORM XOR
+FINAOX LI   TEMP1,1
+       MOV  LINK,TEMP7
+       BL   @FILL1
+       MOV  TEMP7,LINK
+       B    @BKLINK
+*
+*== KEY ROUTINE  CODE= -2  =================================
+*
+KY     MOV  @$ALTI(U),TEMP0
+       JEQ  KEY0                 REVISED THE ALTIN OPTION
+       CLR  TEMP7                hey, you wanna remote keyboard
+       MOVB TEMP7,@KYSTAT        or device help yourself right here.
+       INC  TEMP0                point at flag byte
+       MOVB *TEMP0,TEMP1         get the flag
+       ANDI TEMP1,>1F00          clear it
+       MOVB TEMP1,*TEMP0         write it back
+       DEC  TEMP0                point again at pab
+       LI   TEMP1,>0200          2=read in MDOS
+       MOVB TEMP1,*TEMP0         move it to op byte
+       SYSC @DOS8                call MDOS
+       DEC  TEMP0                point at pab-1 buffer
+       MOVB *TEMP0,TEMP1         move that byte to r1
+       SRL  TEMP1,8              clean it up
+       MOV  TEMP1,TEMP0          back to r0 for calling routine
+       B    @BKLINK              back to forth
+KEY0   MOV  @KEYCNT,TEMP7
+       INC  TEMP7
+       JNE  KEY1
+       MOV  @CURPO$(U),TEMP0
+       BLWP @VSBR             READ CHARACTER AT CURSOR POSITION
+       MOVB TEMP1,@CURCHR     AND SAVE IT
+       LI   TEMP1,>1E00       PLACE CURSOR CHARACTER ON SCREEN
+       BLWP @VSBW
+*
+KEY1   LI   TEMP4,>2000       MASK TO CHECK STATUS
+       BLWP @KSCAN
+       MOVB @KYSTAT,TEMP0
+       COC  TEMP4,TEMP0
+       JEQ  KEY2              JMP IF KEY WAS PRESSED
+*
+       CI   TEMP7,200         NO KEY PRESSED
+       JNE  KEY3
+       MOVB @CURCHR,TEMP1
+       JMP  KEY5
+*
+KEY3   CI   TEMP7,400
+       JNE  KEY4
+       CLR  TEMP7
+       LI   TEMP1,>1E00       CURSOR CHAR
+KEY5   MOV  @CURPO$(U),TEMP0
+       BLWP @VSBW
+KEY4   MOV  TEMP7,@KEYCNT
+       MOV  @INTACT,TEMP7
+       JNE  KEY6
+       LIMI 2
+KEY6   DECT IP                THIS WILL RE-EXECUTE KEY
+       B    *NEXT
+KEY2   SETO @KEYCNT           KEY WAS PRESSED
+       MOV  @CURPO$(U),TEMP0  RESTORE CHARACTER AT CURSOR LOCATION
+       MOVB @CURCHR,TEMP1
+       BLWP @VSBW
+       MOVB @KYCHAR,TEMP0     PUT CHAR IN RIGHT HALF OF TEMP0
+       SRL  TEMP0,8
+       B    @BKLINK
+*
+*== EMIT ROUTINE  CODE= -4  ===== edited altout routine 5/89 (mjm)==
+*
+EMT    MOV  TEMP2,TEMP1       move character to r1
+       MOV  @$ALTO(U),TEMP0
+       JEQ  EMIT0             is altout(u) pointing at pab or zero?
+       CLR  TEMP7             if pab then altout is active
+       MOVB TEMP7,@KYSTAT
+       DEC  TEMP0             1 byte buffer is at pab-1
+       SWPB TEMP1             adjust char
+       MOVB TEMP1,*TEMP0+     move char to 1 byte buffer @pab-1
+       LI   TEMP1,>0300       move write=3 opcode to pab byte 1
+       MOVB TEMP1,*TEMP0+     and increment to point at mode flag
+       MOVB *TEMP0,TEMP1      get mode flags          this may be better with
+       ANDI TEMP1,>1F00       mask for next write     szc but if you're reading
+       MOVB TEMP1,*TEMP0      and back to mode byte   the old code it follows
+       DEC  TEMP0             point at pab again
+       SYSC @DOS8             error checking up to hi level routine
+       B    @BKLINK
+*
+EMIT0  CI   TEMP1,7      IS IT A BELL?  bell call to MDOS 5/89 (mjm)
+       JNE  NOTBEL
+       CLR  TEMP2
+       MOVB TEMP2,@KYSTAT
+       LI   TEMP0,>33            sound op
+       LI   TEMP1,>08            freq in gen 1
+       CLR  TEMP2                     gen 2
+       CLR  TEMP3                     gen 3
+       LI   TEMP4,>0F00          attenuation 1
+       CLR  TEMP5                            2
+       CLR  TEMP6                            3
+       LI   TEMP7,>0A            duration
+       SYSC @DOS6
+       B    @EMEXIT
+*
+NOTBEL CI   TEMP1,8      IS IT A BACKSPACE?
+       JNE  NOTBS
+       LI   TEMP1,>2000
+       MOV  @CURPO$(U),TEMP0
+       BLWP @VSBW
+       JGT  DECCUR
+       JMP  EMEXIT
+DECCUR DEC  @CURPO$(U)
+       JMP  EMEXIT
+*
+NOTBS  CI   TEMP1,>A     IS IT A LINE FEED?
+       JNE  NOTLF
+       MOV  @$SEND(U),TEMP7
+       S    @$SWDTH(U),TEMP7
+       C    @CURPO$(U),TEMP7
+       JHE  SCRLL
+       A    @$SWDTH(U),@CURPO$(U)
+       JMP  EMEXIT
+SCRLL  MOV  LINK,TEMP7
+       BL   @SCROLL
+       MOV  TEMP7,LINK
+       JMP  EMEXIT
+*
+*** SCROLLING ROUTINE
+*
+SCROLL MOV  @$SSTRT(U),TEMP0     VDP ADDR
+       LI   TEMP1,LINBUF      BUFFER
+       MOV  @$SWDTH(U),TEMP2     COUNT
+       A    TEMP2,TEMP0       START AT LINE 2
+SCROL1 BLWP @VMBR
+       S    TEMP2,TEMP0       ONE LINE BACK TO WRITE
+       BLWP @VMBW
+       A    TEMP2,TEMP0       TWO LINES AHEAD FOR NEXT READ
+       A    TEMP2,TEMP0
+       C    TEMP0,@$SEND(U)      END OF SCREEN?
+       JL   SCROL1
+       MOV  TEMP2,TEMP1       BLANK BOTTOM ROW OF SCREEN
+       LI   TEMP0,>2000       BLANK
+       S    @$SEND(U),TEMP2
+       NEG  TEMP2             NOW CONTAINS ADDRESS OF START OF LAST LINE
+       MOV  LINK,TEMP6
+       BL   @FILL1            WRITE THE BLANKS
+       B    *TEMP6
+*
+NOTLF  CI   TEMP1,>D     IS IT A CARRIAGE RETURN?
+       JNE  NOTCR
+       CLR  TEMP0
+       MOV  @CURPO$(U),TEMP1
+       MOV  TEMP1,TEMP3
+       S    @$SSTRT(U),TEMP1  ADJUSTED FOR SCREEN NOT AT 0
+       MOV  @$SWDTH(U),TEMP2
+       DIV  TEMP2,TEMP0
+       S    TEMP1,TEMP3
+       MOV  TEMP3,@CURPO$(U)
+       JMP  EMEXIT
+*
+NOTCR  SWPB TEMP1        ASSUME IT IS A PRINTABLE CHARACTER
+       MOV  @CURPO$(U),TEMP0
+       BLWP @VSBW
+       MOV  @$SEND(U),TEMP2
+       DEC  TEMP2
+       C    TEMP0,TEMP2
+       JNE  NOTCR1
+       MOV  @$SEND(U),TEMP0
+       S    @$SWDTH(U),TEMP0 WAS LAST CHAR ON SCREEN. SCROLL
+       MOV  TEMP0,@CURPO$(U)
+       JMP  SCRLL
+NOTCR1 INC  TEMP0        NO SCROLL NECESSARY
+       MOV  TEMP0,@CURPO$(U)
+*
+EMEXIT B    @BKLINK
+*
+*== CRLF ROUTINE  CODE= -6  ================================
+*
+CLF    MOV  LINK,TEMP5
+       LI   TEMP2,>000D
+       BL   @EMT
+       LI   TEMP2,>000A
+       LIMI 0            PREVIOUS CALL TO EMT ALTERED INT MASK
+       BL   @EMT
+       MOV  TEMP5,LINK
+       B    @BKLINK
+*
+*== ?TERMINAL ROUTINE CODE= -8  ============================
+*
+QTM    BLWP @KSCAN
+       MOVB @KYCHAR,TEMP0
+       SRL  TEMP0,8
+       CI   TEMP0,>82              ******* F4 == >82
+       JEQ  QTERM1
+       CLR  TEMP0
+QTERM1 B    @BKLINK
+*
+*== ?KEY ROUTINE CODE= -10  ================================
+*
+QKY    BLWP @KSCAN
+       MOVB @KYCHAR,TEMP0
+       SRL  TEMP0,8
+       CI   TEMP0,>00FF
+       JNE  QKEY1
+       CLR  TEMP0
+QKEY1  B    @BKLINK
+*
+*== GOTOXY ROUTINE CODE= -12  ==============================
+*
+GXY    MPY  @$SWDTH(U),TEMP3
+       A    TEMP2,TEMP4       POSITION WITHIN SCREEN
+       A    @$SSTRT(U),TEMP4     ADD VDP OFFSET TO SCREEN TOP
+       MOV  TEMP4,@CURPO$(U)
+       B    @BKLINK
+*
+*======USER CONSTANTS (MOVED TO UVARS BELOW AT COLD) ========
+*
+*=====A * INDICATES MCCANN SOFTWARE 5/89 MODIFICATION FOR MDOS====
+*
+*
+UBASE0 BSS  6             BASE OF USER VARIABLES
+       DATA UBASE0        06 USER UCONS
+       DATA SPBASE        08 USER S0
+       DATA RBASE         0A USER R0 { R0$
+       DATA $UVAR         0C USER U0
+       DATA $TIB         *0E USER TIB               NOT AT SPBASE NECESSARILY
+       DATA 31            10 USER WIDTH
+       DATA DPBASE        12 USER DP
+       DATA $SYS$         14 USER SYS$
+       DATA 0             16 USER CURPOS
+       DATA INT1          18 USER INTLNK
+       DATA 0            *1A USER WARNING           DEFAULT TO 0 NOW
+       DATA 64            1C USER C/L$ { CL$
+       DATA $BUFF         1E USER FIRST$
+       DATA $LO           20 USER LIMIT$
+       DATA 1024          22 USER B/BUF$ { BBUF$
+       DATA 1             24 USER B/SCR$ { BSCR$
+       DATA 1             26 USER DISK_LO  (LOW DISK FENCE)
+       DATA 360          *28 USER DISK_HI  (HIGH DISK FENCE)  DSDD 5/89
+       DATA 360          *2A USER DISK_SIZE (IN SCREENS)      DSDD 5/89
+       DATA >F280        *2C USER DISK_BUF  (Buffer no longer used)
+       DATA >F180        *2E USER PABS  (AREA FOR PABS ETC now in ram)
+       DATA 80           *30 USER SCRN_WIDTH
+       DATA 0             32 USER SCRN_START
+       DATA 2000         *34 USER SCRN_END     25 LINE SCRN IN MDOS 5/89
+       DATA INT1         *36 USER ISR
+       DATA 0             38 USER ALTIN
+       DATA 0             3A USER ALTOUT
+*
+$UVAR  BSS  >80           USER VARIABLE AREA
+*
+*===========================================================
+*
+KEYCNT DATA -1           USED IN CURSOR FLASH LOGIC
+CURCHR BSS  2            CHAR AT CURSOR POSITION
+INTACT DATA 0            NON-ZERO DURING INTERRUPT SERVICE
+LINBUF BSS  80           BUFFER FOR SCROLLING   (this must be increased if gt 80
+*                                                character screen is used)
+*===========================================================

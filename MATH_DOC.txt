@@ -1,0 +1,207 @@
+*
+* math library ...  XOP @TEN,0
+*
+*      all floating point arguments must be on an even byte boundary
+*      calling registers must be in PAD from >f000 to >f060
+*
+*      floating point representation, radix 100:
+*
+*      0  = 00 00 xx xx xx xx xx xx
+*     +n  = e0 m0 m1 m2 m3 m4 m5 m6
+*
+*           e0 is int(log[100](n)) + >40
+*           m0 - m6 are numbers from >00 to >63 (0 to 99)
+*           m0 is most  significant digits of mantissa,
+*           m6 is least significant digits of mantissa.
+*
+*           in normalized numbers, decimal is between m0 and m1
+*     -n  is same as "n" except first word is negated ... -(e0 m0)
+*
+*      examples:
+*      decimal                floating point
+*
+*      7                      >40 >07 >00 >00 >00 >00 >00 >00
+*      70                     >40 >46 >00 >00 >00 >00 >00 >00
+*      2,345,600              >43 >02 >22 >38 >00 >00 >00 >00
+*      23,456,000             >43 >17 >2D >3C >00 >00 >00 >00
+*      0                      >00 >00 >xx >xx >xx >xx >xx >xx
+*      -7                     >BF >F9 >00 >00 >00 >00 >00 >00
+*      -70                    >BF >BA >00 >00 >00 >00 >00 >00
+*      -2,345,600             >BC >FE >22 >38 >00 >00 >00 >00
+*
+*  opcode #0
+*  FCOMP    floating point compare
+*           input:            r0=0
+*                             r2=^float1
+*                             r3=^float2
+*
+*           return:           status reg = AG set iff (float2 > float1)
+*                                          EQ set iff (float2 = float1)
+*
+*  opcode #1
+*  FSUB     floating point subtract
+*           input:            r0=1
+*                             r1=^result
+*                             r2=^float1
+*                             r3=^float2
+*           return:           r0=error code
+*                             ^r1 = float2 - float1
+*
+*  opcode #2
+*  FADD     floating point add
+*           input:            r0=2
+*                             r1=^result
+*                             r2=^float1
+*                             r3=^float2
+*           return:           r0=error code
+*                             ^r1 = float2 + float1
+*
+*  opcode #3
+*  FMULT    floating point multiply
+*           input:            r0=3
+*                             r1=^result
+*                             r2=^float1
+*                             r3=^float2
+*           return:           r0=error code
+*                             ^r1 = float2 * float1
+*
+*  opcode #4
+*  FDIV     floating point divide
+*           input:            r0=4
+*                             r1=^result
+*                             r2=^float1
+*                             r3=^float2
+*           return:           r0=error code
+*                             ^r1 = float2 / float1
+*
+*  opcode #5
+*  PWR      floating point power
+*           input:            r0=5
+*                             r1=^result
+*                             r2=^float1
+*                             r3=^float2
+*           return:           r0=error code
+*                             ^r1 = float2 ^ float1
+*
+*  opcode #6
+*  EXP      floating point e^x
+*           input:            r0=6
+*                             r1=^result
+*                             r2=^float1
+*           return:           r0=error code
+*                             ^r1 = e ^ float1
+*
+*  opcode #7
+*  LOG      floating point ln(x)
+*           input:            r0=7
+*                             r1=^result
+*                             r2=^float1
+*           return:           r0=error code
+*                             ^r1 = ln( float1 )
+*
+*  opcode #8
+*  SQR      floating point sqr(x)
+*           input:            r0=8
+*                             r1=^result
+*                             r2=^float1
+*           return:           r0=error code
+*                             ^r1 = sqr( float1 )
+*
+*  opcode #9
+*  COS      floating point cos(x)
+*           input:            r0=9
+*                             r1=^result
+*                             r2=^float1
+*           return:           r0=error code
+*                             ^r1 = cos( float1 )
+*
+*  opcode #10
+*  SIN      floating point sin(x)
+*           input:            r0=10
+*                             r1=^result
+*                             r2=^float1
+*           return:           r0=error code
+*                             ^r1 = sin( float1 )
+*
+*  opcode #11
+*  TAN      floating point tan(x)
+*           input:            r0=11
+*                             r1=^result
+*                             r2=^float1
+*           return:           r0=error code
+*                             ^r1 = tan( float1 )
+*
+*  opcode #12
+*  ATN      floating point atn(x)
+*           input:            r0=12
+*                             r1=^result
+*                             r2=^float1
+*           return:           r0=error code
+*                             ^r1 = atn( float1 )
+*
+*  opcode #13
+*  GRI      floating point greatest integer
+*           input:            r0=13
+*                             r1=^result
+*                             r2=^float1
+*           return:           r0=error code
+*                             ^r1 = || float1 ||
+*
+*  opcode #14
+*  CFI      convert floating point to integer
+*           input:            r0=14
+*                             r2=^float1
+*           return:           r0=error code
+*                             r1 = integer
+*
+*  opcode #15
+*  CIF      convert integer to floating point
+*           input:            r0=15
+*                             r1=^result
+*                             r2=integer
+*           return:           r0=error code
+*                             ^r1 = float( integer )
+*
+*  opcode #16
+*  CSINT    convert string to integer
+*           input:            r0=16
+*                             r2=^string
+*           return:           r0=error code
+*                             r1 = integer
+*
+*  opcode #17
+*  CSN      convert string to floating point
+*           input:            r0=17
+*                             r1=^result
+*                             r2=^string
+*                             r3=strlen
+*           return:           r0=error code
+*                             ^r1 = float( string )
+*
+*  opcode #18
+*  CNS      convert float to string
+*           input:            r0=18
+*                             r1=^string
+*                             r2=^float1
+*                             r3=opt1
+*                                 bit 0: 0=free form (ignore opt2, opt3)
+*                                        1=fixed (opt2, opt3 are field sizes)
+*                                 bit 1: 1 for explicit sign
+*                                 bit 2: 1 to show sign of positive number
+*                                        as a '+' instead of as a space.
+*                                        (bit 1 must also be on)
+*                                 bit 3: 1 for E-notation output
+*                                 bit 4: 1 for extended E-notation
+*                                        (bit 3 must also be 1)
+*                             r4=if fixed format, number of places to left
+*                                of decimal point, including explicit sign
+*                             r5=if fixed format, number of places to the
+*                                right of decimal point and including decimal
+*                                point
+*                             if fixed format, with exponent, r4,r5 exclude the
+*                             3 places for an exponent
+*
+*           return:           r0=error code
+*                             ^r1 = string
+*
+*

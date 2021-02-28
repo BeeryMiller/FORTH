@@ -1,0 +1,107 @@
+     On screen 8 of the FORTHSCRNS file you will find utility words which
+     allow you to change between FILEFORTH and DISKFORTH and change the
+     number or name of the base drive.  Incidentally, MDOS treats the
+     diskette as the base file (i.e. "DSK1." is the file which is really
+     the whole diskette in drive 1.) Note: this is damn clever, thank you
+     Paul Charlton. There is also CREATE-FILE which will allow creation of
+     a file of blocks for FILEFORTH.  The FILEFORTH files are display-fixed
+     128 (D/F 128) files.  D/F 128 files are used because TI-Forth sectors
+     are 256 bytes (4 sectors make a Forth block) but D/F 256 files are not
+     allowed in the 99/4A system so the next most reasonable size was
+     chosen.  D/V 80 files would have been nice but the overhead for
+     variable file use defeats the KISS philosophy of good Forth.  Several
+     authors (including Glen Davis in Computer Shopper) show how to
+     translate from D/V 80 to blocks.  The word SET-ID on screen 8 sets up
+     the file ID information in the buffer required by MDOS.  SET-ID is set
+     up to create files which contain 16 blocks.  To create larger or
+     smaller files change the value in that word from 64 to another
+     multiple of 4.  TI-Forth prohibited loading from screen zero, that has
+     been kept consistent.  TI-Forth provided screen 3 as the "boot" screen
+     that has also been carried forward.  The WARNING user variable default
+     has been changed to zero so it shows "MSG # n" or errors instead of
+     going to the disk to try to read the error message.  If you like the
+     disk based error messages by all means change this either on the boot
+     screen or by recompiling (see WARNING in the TI-Forth docs).
+     
+     McCann Software Forth Screens included in FORTHSCRNS:
+     
+     SCREEN 1
+     
+     The system calls are given names instead of just numbers (i.e. MDOS
+     instead of -22 SYSTEM.)  Using the defining word CALL saves a couple
+     bytes per SYSTEM call word versus each being a colon definition as in
+     the TI-Forth screens.
+     
+     SCREEN 2
+     
+     In working with TI-Forth I have tried to whittle down the size of
+     things like the File words and make them more useable.  The word FILE
+     changes the value of PAB-ADDR depending on the index used:
+     0 FILE changes PAB-ADDR to "point to" the Forth system PAB, 1 FILE
+     points to the first user PAB etc.
+     
+     PBW is just a defining word to index into each pab and return the
+     address of the referent (i.e. REC-LEN returns the logical record
+     length (16 bit) address within the currently selected PAB).
+     
+     SET is a defining word which handles the combinations and permutations
+     of the PAB operation byte (POP).  Sort of reminds me of creating
+     machine instructions from assembler operands.
+     
+     SCREEN 4.
+     
+     HEX F160 is the XOP workspace register base.  Named REG0 here.
+     The file operations are greatly simplified by MDOS.  These words are
+     set up to do RAM based i/o.  You will notice two levels of
+     simplification first by the RAM based i/o and the second level of
+     simplicity comes from the file primitives on screen 2.
+     
+     SCREEN 5 and 6.  These are merely the 80 column equivalents of the 40
+     column TI-Forth operations.
+     
+     SCREEN 7
+     
+     This screen is a redefinition of TI-Forth's SWCH and UNSWCH words for
+     sending output to printer or other single byte device.  We set up the
+     defining word DEVICE so any new device may be easily defined.  SWCH
+     uses the first user PAB for its output and the byte immediately
+     preceeding the PAB for its 1 byte buffer.  We used the variable !PB to
+     store the previous contents of the PAB-BUF i/o buffer.  Since the
+     value is saved and restored in two separate words we cannot use either
+     >R R> pairs or the parameter stack reliably for this.
+     
+     
+     OK, OK so you want another example of how to use MDOS calls, here
+     goes:  In Paul's MDOS calls docs he shows how to get the time and date
+     from the system using the Utility call #9.  One thing I have found out
+     about some of the MDOS calls especially the UTILITY calls the buffer
+     needs to be in the high page (>E000 -- >FFFF).  This may be unique to
+     my experience but, since it works, I won't complain.
+     
+     Date & Time words:
+     
+     Requires REG0 (defined on screen 4: HEX F160 CONSTANT REG0)
+     Requires UTIL (defined on screen 1: DECIMAL 36 CALL UTIL or it could
+     be defined DECIMAL : UTIL 36 SYSTEM ;)
+     
+     HEX FFE0 CONSTANT UTILBUF
+     
+     : TIME 1 REG0 ! UTILBUF REG0 2+ ! UTIL UTILBUF 8 TYPE ;
+     : DATE 4 REG0 ! UTILBUF REG0 2+ ! UTIL UTILBUF 8 TYPE ;
+     
+     DATE 2 SPACES TIME <ENTER>
+     
+     Date & Time explanation:  REG0 is the address of XOP workspace
+     register zero.  UTIL is the MDOS utility system call.  UTILBUF is
+     defined in the high page as a buffer as required by the UTIL call to
+     hold the string that the MDOS call returns.  In TIME we load XOP
+     workspace register zero with 1 (the time call) and register one with
+     the address of UTILBUF.  UTIL makes the MDOS call then the phrase
+     UTILBUF 8 TYPE prints the time on the screen at the current cursor
+     location.  DATE 2 SPACES TIME gets the date emits two spaces for
+     clarity and then prints the time.  Any questions?
+     
+     McCann Software
+     4411 N. 93rd St.
+     Omaha, NE  68134
+ÄãÄ—ãêïü©≥Ω«’’’’’’’’Äã

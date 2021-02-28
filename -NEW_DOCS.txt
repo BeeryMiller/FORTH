@@ -1,0 +1,74 @@
+     Notes on improvements to TI-Forth for MDOS on Geneve 9640 by MYARC
+     Copyright 1989   Mike McCann   (6/30/89)
+     
+     In porting The Geometer's Apprentice (c) 1989 Mike McCann to TI-Forth for
+     MDOS I discovered a couple things in the Forth that could be improved.
+     The most complex of these changes had to do with a feature of the BREAD
+     and BWRITE calls in MDOS.  I think if I take a few lines to explain what I
+     know about these calls the changes may make more sense.  BREAD reads
+     sectors (256 bytes) from any file or the diskette as a file.  A Forth
+     block is 1024 bytes so the word RDISK requests 4 consecutive sectors to
+     make up a block.  BREAD goes out to the disk each time a block is
+     requested and reads the FCB off the disk to find out where the 4 sectors
+     are located.  This is fine for reading or writing a block at a time.  One
+     of the nice things about TI-Forth was BLOAD which let you BSAVE a whole
+     application in binary format to several consecutive blocks and reload them
+     really fast.  Since the MDOS version allows 44K of dictionary space this
+     means an application could be up to 44 blocks ( 176 sectors long).
+     Unfortunately, in executing BLOAD using BREAD my disk drives sounded like
+     they were trying to saw my desk in half.  This is because they had to read
+     the FCB every time they went to read a block.  To answer this I have
+     replaced BLOAD and BSAVE with new words FLOAD and FSAVE for "File Load"
+     and "File Save".  I also wanted a way to allow the system to do a FLOAD
+     and LOAD on COLD start to make stand alone systems easier to create.
+     
+     New and changed words in the kernel and their uses:
+     
+     ZBLK ( -- f ) ZBLK checks the zero block in the current file to see if it
+     is a FLOAD type file and leaves the appropriate flag.
+     
+     I/OFILE ( --) NOTE: this seemed a lot simpler than DISKFORTH and FILEFORTH
+     as on screen 8 although they still work.  I/OFILE changes the current file
+     that I/O is read from/written to, used as: 
+     
+     I/OFILE DSK1.FORTHSCRNS     .....for FILE i/o
+     I/OFILE DSK1.               .....for diskette i/o
+     
+     BOOTI ( --) BOOTI is Boot initialization routine used in FLOAD, BOOT and
+     COLD.
+     
+     STATE@ ( a a-) STATE@ reads the state vectors from the FLOAD image and
+     stores it into the state variables.  NOTE: this word, along with STATE! on
+     screen 14, is also useful if you are using RAM based overlays.
+     
+     FLOAD ( --) FLOAD is File Load.  It loads a binary image from a previously
+     FSAVEd file.  FLOAD works as follows: It reads the zero block of the file
+     to see if it has the magic identifier >4D4D in position 14.  If so, it
+     loads the entire image from the file.
+     Used as:  I/OFILE DSK1.FLOADFILE FLOAD
+     
+     COLD (--) COLD does a COLD start of the system from the diskette.  If a
+     FLOAD file is present as the BOOT file the file is FLOADed then the last
+     block/screen of the file is LOADed (see FSAVE).  If the BOOT file is not a
+     FLOAD file the screen 3 is LOADed as with TI-Forth.
+     
+     BOOT (--) BOOT acts just the same as before.  The definition is just
+     simpler due to the factoring of BOOTI.
+     
+     New word on Screen 14 of FORTHSCRNS:
+     
+     FSAVE ( ' TASK FSAVE DSKn.FILENAME -) or
+           ( ' word NFA FSAVE DSKn.FILENAME)
+     FSAVE is used to create a FLOADable file.  FSAVE saves a binary image of
+     the Forth dictionary from ' TASK or ' word NFA to HERE.  It also leaves
+     enough space at the end of the file for a boot screen.  If a FLOAD file is
+     used as the boot file, COLD LOADs the last block/screen of that file.  You
+     will need to use your editor to fix this screen up for booting purposes.
+     After you FSAVE the file type 0 BLOCK 18 + @ DUP CLEAR EDIT or O BLOCK 18
+     + @ CLEAR FLUSH.  If you wish to just FLOAD this file from the running
+     Forth system the boot screen is not needed.
+     
+     Incidentally, in case you didn't look, I included a heavily hacked version
+     of Lutz Winkler's editor on screens 9-13 of FORTHSCRNS.  My thanks to him
+     and apologies for reducing it so severely.
+ÄãÄ’ãêïü©≥Ω«’’’’’’’’Äã

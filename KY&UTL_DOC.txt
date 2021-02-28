@@ -1,0 +1,82 @@
+* keyboard    XOP @FIVE,0
+*      IN:     R0Lsb =  scan mode   (like ti modes, 0-5)
+*
+*      OUT:    R0Lsb =  returned mode  (same as >8374 in 99/4a)
+*              R1Msb =  returned scan code (same as >8375)
+*              R2Msb =  joystick Y value     (same as >8376)
+*              R2Lsb =  joystick X value     (same as >8377)
+*           EQ bit in Status register set if there's a new key in R0
+*
+*              mode 7 = break key check  return EQ=1 if Break on
+*              mode 8 = raw scan code returned in R1h
+*                       raw code returned is >FF if there was no code in buffer
+* utility library ...  XOP @nine,0
+*
+* OP #0     CHECK TIME FOR VALIDITY
+*                             PASS:   r0=0
+*                             return: EQ bit set if time is valid
+*                                           reset if time is invalid
+*
+* OP #1     CONVERT TIME TO STRING
+*                             PASS:   R0=1
+*                                     R1=pointer to string in local mem
+*                                        (at least 10 bytes)
+*                             return: 8 character string
+*
+* OP #2     CONVERT STRING TO TIME
+*                             PASS:   R0=2
+*                                     R1=pointer to string in local mem
+*                                        (at least 10 bytes)
+*                             return: EQ flag set if time was valid
+*
+* OP #3     CHECK DATE FOR VALIDITY
+*                             PASS:   R0=3
+*                             return: EQ bit is set if date is valid
+*
+* OP #4     CONVERT DATE TO STRING
+*                             PASS:   R0=4
+*                                     R1=pointer to string in local mem
+*                                        (at least 10 bytes)
+*                             return: 8 character string
+*
+* OP #5     CONVERT STRING TO DATE
+*                             PASS:   R0=5
+*                                     R1=pointer to string in local mem
+*                                        (at least 10 bytes)
+*                             return: EQ flag set if date was valid
+*
+* OP #6     CONVERT MM,DD,YYYY into julian date
+*                             PASS:   R0=6
+*                                     R1=month
+*                                     R2=day
+*                                     R3=year
+*
+*                             return: R1=MSword of julian date
+*                                     R2=LSword of julian date
+*
+* OP #7     return day of week
+*                             PASS:   R0=7
+*                             return: R1=day of week, 1-7
+*
+* OP #8     parse filename from logical descriptor to physical descriptor
+*    IN:
+*        R1= POINTER TO TEXT OF STRING TO PARSE               exec address
+*        R2= ^ TO LENGTH BYTE IN STRING OUT BUFFER            exec address
+*            (1st byte is maxlen for the buffer)
+*        R3= FLAG TO CONTROL GENERATION OF ALIAS PREFIX
+*   OUT:
+*        R0= pointer to ending delimiter
+*        R1= 0 is no error, <>0 is error
+*        EQUAL FLAG set by contents of R1
+*
+* OP #9     load program image task
+*    in:  r0=9
+*         r1=pointer to length byte of image name             exec address
+*
+*    out: EQ set if no error
+*         r0=error code
+*              0=no error
+*              1=not enough memory to load task
+*              2=bad name for image
+*              3=invalid header on task
+*              4=task not found, hardware error, wrong file type for task

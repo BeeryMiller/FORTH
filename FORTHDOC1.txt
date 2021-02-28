@@ -1,0 +1,190 @@
+  0N
+     TI-Forth for Geneve 9640--Documents--Copyright 1989, Mike McCann
+     Memory Map
+     
+     >0000 -- >0400      MDOS reserved
+     >0400 -- >0504      approximate size of loader
+     >0504 -- >2700      approximate loacation of TASK at dict. base
+     >2700 -- >D800      user dictionary (about 44K)
+     >D800               stack base
+     >D800 -- >D850      TIB area
+     >D850 -- >E964      Disk block buffers
+     >E964 -- >EFFE      Return Stack area
+     >F000 -- >F060      free chip ram
+     >F060 -- >F080      Forth's on chip workspace
+     >F080 -- >F140      MDOS reserved space
+     >F140 -- >F160      Forth Utility Workspace
+     >F160 -- >F180      Forth XOP Utility Workspace
+     >F180 -- >F280      1 Forth PAB and 3 user PABs
+     >F280 -- >F780      Forth 1K Disk Buffer (largely unused)
+     >F780 -- >FFFE      Free Space
+     
+     
+     New System Table
+     
+     CODE=-22 exit to MDOS
+     CODE=-20 i/o filename address to stack
+     CODE=-18 DRIVE SELECTION based on i/o filename
+     CODE=-16 block write
+     CODE=-14 block read
+     CODE=-12 GOTOXY
+     CODE=-10 ?KEY
+     CODE=-8 ?TERMINAL
+     CODE=-6 CRLF
+     CODE=-4 EMIT
+     CODE=-2 KEY
+     CODE=0 VSBW
+     CODE=2 VMBW
+     CODE=4 VSBR
+     CODE=6 VMBR
+     CODE=8 VWTR
+     CODE=10 GPLLNK       removed 
+     CODE=12 XMLLNK       removed 
+     CODE=14 DSRLNK       removed 
+     CODE=16 CLS
+     CODE=18 FORMAT-DISK  removed 
+     CODE=20 VFILL
+     CODE=22 VAND
+     CODE=24 VOR
+     CODE=26 VXOR
+     CODE=28 KEYB  MDOS system call 5
+     CODE=30 VIDEO MDOS system call 6
+     CODE=32 MEMRY MDOS system call 7
+     CODE=34 DOIO  MDOS system call 8
+     CODE=36 UTIL  MDOS system call 9
+     CODE=38 MATH  MDOS system call 10
+     
+     The above calls are executed by "n" SYSTEM where "n" is the CODE=
+     number which must be on the stack at the time SYSTEM is executed.
+     Many of these calls have other requirements such as additional values
+     on the parameter stack or in the case of MDOS system calls values in
+     the XOP registers.  All system calls which were present in TI-Forth
+     and have not been removed require the same parameters present as in
+     the 4A version.  The MDOS system calls follow the prescriptions in
+     Paul Charlton's MDOS system call guide which has been posted on many
+     bulletin boards and is usually available from user group libraries.
+     You should make sure to have a recent edition before exploring as new
+     calls (especially in the Video area) were added since the first
+     version was posted.
+     
+     To use an MDOS system call from Forth I generally clear the XOP
+     workspace registers (eg. HEX F160 BL ERASE).  Next, I place the values
+     required to execute the MDOS operation into consecutive words in the
+     workspace (i.e. Register 0 = F160, Register 1 = F162, Register 3 =
+     F164, etc.) This works because registers on the 9995 are just
+     consecutive 16 bit words in the memory and because the way I wrote
+     this Forth it uses the workspace at HEX F160 for MDOS system calls
+     exclusively.  Once the registers are loaded then "n" SYSTEM is
+     executed to call the MDOS operation.  Since the XOP workspace is used
+     only for MDOS system calls a "post mortem" on the registers is simply
+     done by "dumping" the registers with HEX F160 BL DUMP.  I also store
+     the value in the STATUS register on return from the MDOS system call
+     in register 8 ( HEX F170) so errors may be detected from the Forth
+     level.  I picked register 8 because MDOS does not require parameters
+     to be passed in registers other than 0 through 7.
+     
+     The easiest way to understand the MDOS calls is by an example.  This
+     example happens to be how the FORTHIMAGE file is created.  FORTHIMAGE
+     is created from the running Forth program.  Steps 8 - 11 below
+     illustrate the use of the MDOS I/O system call.  In this example the
+     "Save" operation is executed.  It requires a PAB to be set up with the
+     file information and the address of the PAB to be in XOP register 0
+     before the MDOS call is made.  To create your own Forth you may follow
+     this prescription.
+     
+     You will need the following.
+     
+     1.  The excellent tools by Clint Pulley:
+       A.  ASM the assembler which runs from MDOS.
+       B.  LDR the loader which runs from MDOS
+       C.  Myword by Myarc (or other suitable program editor which will
+           accept the large files like 4THSRC.)
+     
+           Clint Pulley
+           38 Townsend Ave
+           Burlington, Ontario
+           Canada  L7T 1Y6
+
+     Clint's programs are fairware if you use them please pay him.
+     
+     2.  The assembler source files for " TI-Forth for the Geneve 9640" by
+     McCann Software are: 4THGEN, 4THSRC, 4THSRC1, 4THSRC2, 4THSRC3,
+     4THSRC4, and FORTHSCRNS.  For the easiest procedure these
+     should all be on one double-sided double-density diskette.
+     
+     
+     Creating a new Forth is the process of assembling the above files into
+     two files FORTH and FORTHIMAGE.  The procedure to reassemble the
+     Forth, just as it is now, is as follows:
+     
+     1.  Our Forth kernel is too large to load into the first page in
+     memory >0400 -- >2000 so we must load a portion (the file FORTH) which
+     requests memory from MDOS and loads the remainder of Forth (the file
+     FORTHIMAGE).  For consistency, and to make load addresses easy to
+     compute we include the loader source inside the 4THSRC file.  To
+     separate the loader source from 4THSRC we change one branch address
+     and "uncomment" the END statement then save the first part of 4THSRC
+     to a file called LOADFORTH.  To create LOADFORTH load the file 4THSRC
+     into your program editor, change the B @GOFTH statement near the start
+     of the file to B @LOADR, uncomment the END statement (remove the * at
+     about line 100) and save the lines up to and including END to the file
+     LOADFORTH.  Also note that by including the loader inside the 4THSRC
+     we allow Clint's LDR program to load and run the Forth so it can be
+     used to save its own image as we did in the procedure we detailed.  
+     
+     2.  Assemble LOADFORTH into a file LOADER with the ASM.
+         (e.g. ASM DSK1.LOADFORTH DSK1.LOADER /R)
+     3.  Create the file FORTH with the loader program LDR.
+         (e.g. LDR DSK1.LOADER DSK1.FORTH)
+     4.  Assemble 4THGEN into the file FORTHOBJ with the ASM.
+         (e.g. ASM DSK1.4THGEN DSK1.FORTHOBJ /R)
+     5.  Make sure the file FORTHSCRNS is in drive 1 and then use the
+         loader LDR to load and run FORTHOBJ.
+         (e.g. LDR DSK1.FORTHOBJ)
+         NOTE:  When LDR has loaded the FORTHOBJ it "hands off" to Forth.
+         Forth begins execution by clearing the screen and looking for
+         the file FORTHSCRNS to load screen 3.  Screen 3 was known in
+         TI-Forth as the "boot screen".  Our new version is file based but
+         it still treats the file as a series of consecutive blocks
+         numbered from 0.  We have retained screen 3 as the "boot screen".
+     6.  When you see the TI FORTH message on the screen you may proceed
+         with creating the FORTHIMAGE file as follows:
+     7.  3 1 THRU 8 4 THRU ( this will load some utility words for you to
+         use.) FORTHSCRNS must be present.
+     8.  HEX F1A0 CONSTANT PAB1--define a PAB area.  All following
+         instructions are in HEX for ease of relating to DUMP output.
+     9.  Creating the PAB data for FORTHIMAGE save will require a little
+         exploring using the word DUMP.
+         a.  450 100 DUMP will let you find the default i/o data. It will
+             be in the area of address 4BA and will look like:
+             0500 0000 0000 0xxx 0000 0000 C000 000F DSK1.FORTHIMAGE
+         b.  When you find the above note the address and move the entire
+             PAB to PAB1. (4BA PAB1 20 CMOVE)
+         c.  Change the operation from Load to Save (6 PAB1 C!).
+         d.  Get the size ( ' TASK xxx - PAB1 C + ! ).  Note that the load
+             address (xxx) is cleverly already computed in the i/o data
+             which makes the size easy to compute.
+     10. Clear the MDOS call registers (REG0 20 ERASE).
+     11. Store the PAB1 address into register 0. ( PAB1 REG0 !)
+     12. Put the appropriate diskette in the drive and execute the save by
+          entering ( HEX 22 SYSTEM ).
+     13. Once you have saved FORTHIMAGE you may exit back to MDOS with the
+         system call DECIMAL -22 SYSTEM.
+     14. Put the newly created Forthdisk into the current source disk and
+         type FORTH.
+     
+     You may load Forth from any drive.  To load from a drive it must be
+     selected as the default drive.  That is, you may type FORTH from any
+     drive but not A>D:FORTH (until we have an MDOS utility for this.)  The
+     default drive remains the default drive for i/o as well until it is
+     changed from within Forth.  This is accomplished in two parts.  When
+     Forth is loaded we use the MDOS utility call number 8 to get the
+     default drive number.  Next, when block i/o is done from file or disk
+     the offset is added to the default drive number.  Thus, if the default
+     drive was "B:" when Forth was loaded, if you execute 3 LIST, Forth
+     goes to DSK2 (same as B:) screen 3 for the LIST operation.  If the
+     DISK_SIZE is 90 (single sided single density diskettes) and 93 LIST is
+     executed Forth goes to DSK3 screen 3 for the list operation.  By the
+     way, I have DSDD diskettes so I set the DISK_SIZE user variable to
+     default to 360.
+ÄãÄ—ãêïü©≥Ω«’’’’’’’’Äã

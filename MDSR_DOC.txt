@@ -1,0 +1,790 @@
+*
+* I/O library ...  XOP @eight,0
+*
+*      PASS: r0=pointer to PAB in local memory (64k addressable by CPU)
+*
+*      PAB = peripheral access block
+*
+*      PAB format:
+*
+*      byte  0      i/o opcode
+*            1      mode flags
+*            2      returned error code
+*            3      buffer address, high byte       |
+*            4      buffer address, middle byte     | task-virtual
+*            5      buffer address, low byte        |      address
+*            6      \
+*            7       \ record number
+*            8      \
+*            9       \ logical record length
+*           10      memory type flag, >00 is CPU, non-zero is VDP
+*           11      character count, high byte
+*           12      character count, middle byte
+*           13      character count, low byte
+*           14      status byte
+*           15      name length <byte count>
+*           16+     text of name
+*
+*         Byte 1, mode flags:
+*
+*         7 6 5 4 3 2 1 0    meaning
+*         | | | | | | | +--- 0=sequential file access
+*         | | | | | | |      1=relative file access <fixed files only>
+*         | | | | | +-+----- 00=update mode, r/w access, fixed files only
+*         | | | | |          01=output mode, write only, erase old file contents
+*         | | | | |          10=input mode, read only
+*         | | | | |          11=append mode, write only to EOF, not for fixed
+*         | | | | +--------- 0=display format data
+*         | | | |            1=internal format data
+*         | | | +----------- 0=fixed record lengths
+*         | | |              1=variable record lengths
+*         +-+-+------------- not used, set to zero!
+*
+*         Byte 2, error codes:
+*
+*         7 6 5 4 3 2 1 0
+*         | | | | | | | |
+*         | | | +-+-+-+-+--- extended code for error #7, mask otherwise
+*         | | |
+*         +-+-+- 000 non-existent device name
+*                001 operation aborted due to write protection
+*                010 bad open attribute (filetype,record length,mode)
+*                011 illegal operation (bad opcode on this device)
+*                100 out of table space, no free buffers
+*                101 attempt to read past end of file
+*                110 low-level device error (parity, bad media)
+*                111 catch-all for other errors
+*                    (mismatch between program and data file,
+*                     non-existent file opened for input, etc)
+*
+* PAB usage, by opcode:
+*
+*
+*      OPEN         pab in
+*
+*      byte  0      00
+*            1      mode flags
+*            2      -
+*            3      -
+*            4      -
+*            5      -
+*            6      \  number of records to reserve space for
+*            7       \ on an open which creates a new file
+*            8      \  logical record length to use. if this is zero and the
+*            9       \ file exists, uses file's record length, otherwise
+*                    + if zero, and file doesn't exist, defaults to 80
+*           10      -
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*      OPEN         pab out
+*
+*      byte  0      -
+*            1      -
+*            2      error code
+*            3      -
+*            4      -
+*            5      -
+*            6      -
+*            7      -
+*            8      \
+*            9       \ returned record length, different only if zero was passed
+*           10      -
+*           11      0
+*           12      \  true record length of file, will not agree with bytes 8,9
+*           13       \ if there was a mismatch on the OPEN
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*
+*      CLOSE        pab in         requires prior OPEN
+*
+*      byte  0      01
+*            1      mode flags
+*            2      -
+*            3      -
+*            4      -
+*            5      -
+*            6      -
+*            7      -
+*            8      -
+*            9      -
+*           10      -
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*      CLOSE        pab out
+*
+*      byte  0      -
+*            1      -
+*            2      error code
+*            3      -
+*            4      -
+*            5      -
+*            6      -
+*            7      -
+*            8      -
+*            9      -
+*           10      -
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*
+*      READ         pab in         requires prior OPEN
+*
+*      byte  0      02
+*            1      mode flags
+*            2      -
+*            3      \
+*            4       \
+*            5        \ buffer address
+*            6      \
+*            7       \ on FIXED files, record number to read from
+*            8      \
+*            9       \ logical record length, as returned by OPEN
+*           10      transfer flag: 0 is cpu, non-zero is VDP
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*      READ         pab out
+*
+*      byte  0      -
+*            1      -
+*            2      error code
+*            3      -
+*            4      -
+*            5      -
+*            6      \  for fixed files
+*            7       \ (passed record number)+1
+*            8      -
+*            9      -
+*           10      -
+*           11      0
+*           12      \
+*           13       \ number of chars transfered to buffer
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*
+*      WRITE        pab in         requires prior OPEN
+*
+*      byte  0      03
+*            1      mode flags
+*            2      -
+*            3      \
+*            4       \
+*            5        \ buffer address
+*            6      \
+*            7       \ for fixed files, record number to write to
+*            8      \
+*            9       \ logical record length, as returned by OPEN
+*           10      transfer flag: 0 is cpu, non-zero is VDP
+*           11      \
+*           12       \
+*           13        \ number of chars to write from buffer into record
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*      WRITE        pab out
+*
+*      byte  0      -
+*            1      -
+*            2      error code
+*            3      -
+*            4      -
+*            5      -
+*            6      \  for fixed files,
+*            7       \ (passed record number)+1
+*            8      -
+*            9      -
+*           10      -
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*
+*      RESTORE      pab in         requires prior OPEN
+*
+*      byte  0      04
+*            1      mode flags
+*            2      -
+*            3      -
+*            4      -
+*            5      -
+*            6      \  for fixed files in relative access mode, record number
+*            7       \ to position the r/w pointer-all others go to file start
+*            8      -
+*            9      -
+*           10      -
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*      RESTORE      pab out
+*
+*      byte  0      -
+*            1      -
+*            2      error code
+*            3      -
+*            4      -
+*            5      -
+*            6      \
+*            7       \ updated record number for fixed files
+*            8      -
+*            9      -
+*           10      -
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*
+*      LOAD         pab in
+*
+*      byte  0      05
+*            1      -
+*            2      -
+*            3      \
+*            4       \
+*            5        \ buffer address
+*            6      -
+*            7      -
+*            8      -
+*            9      -
+*           10      transfer flag: 0 is cpu, non-zero is VDP
+*           11      \
+*           12       \
+*           13        \ maximum number of chars to allow from IMAGE file
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*      LOAD         pab out
+*
+*      byte  0      -
+*            1      -
+*            2      error code
+*            3      -
+*            4      -
+*            5      -
+*            6      0
+*            7      \
+*            8       \  number of bytes in IMAGE file, returned even when
+*            9        \ LOAD fails due to buffer size
+*           10      -
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*
+*      SAVE         pab in
+*
+*      byte  0      06
+*            1      -
+*            2      -
+*            3      \
+*            4       \
+*            5        \ buffer address
+*            6      -
+*            7      -
+*            8      -
+*            9      -
+*           10      transfer flag: 0 is cpu, non-zero is VDP
+*           11      \
+*           12       \
+*           13        \ number of bytes to save as an IMAGE
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*      SAVE         pab out
+*
+*      byte  0      -
+*            1      -
+*            2      error code
+*            3      -
+*            4      -
+*            5      -
+*            6      -
+*            7      -
+*            8      -
+*            9      -
+*           10      -
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*
+*      DELETE file  pab in
+*
+*      byte  0      07
+*            1      -
+*            2      -
+*            3      -
+*            4      -
+*            5      -
+*            6      -
+*            7      -
+*            8      -
+*            9      -
+*           10      -
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*      DELETE file  pab out
+*
+*      byte  0      -
+*            1      -
+*            2      error code
+*            3      -
+*            4      -
+*            5      -
+*            6      -
+*            7      -
+*            8      -
+*            9      -
+*           10      -
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*
+*      DELETE rec   pab in         reserved for key-indexed files
+*                                  not yet supported
+*      byte  0      08
+*            1      -
+*            2      -
+*            3      -
+*            4      -
+*            5      -
+*            6      -
+*            7      -
+*            8      -
+*            9      -
+*           10      -
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*      DELETE rec   pab out
+*
+*      byte  0      -
+*            1      -
+*            2      error code= >60, bad opcode
+*            3      -
+*            4      -
+*            5      -
+*            6      -
+*            7      -
+*            8      -
+*            9      -
+*           10      -
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*
+*      STATUS       pab in    can be used on open or closed file
+*
+*      byte  0      09
+*            1      -
+*            2      -
+*            3      -
+*            4      -
+*            5      -
+*            6      -
+*            7      -
+*            8      -
+*            9      -
+*           10      -
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*      STATUS       pab out
+*
+*      byte  0      -
+*            1      -
+*            2      error code
+*            3      -
+*            4      -
+*            5      -
+*            6      -
+*            7      -
+*            8      -
+*            9      -
+*           10      -
+*           11      -
+*           12      -
+*           13      -
+*           14      flag byte
+*
+*     lsb bit 0     0=not at end of file
+*                   1=at end of open file, read not possible, write is
+*             1     0=there is space to expand file
+*                   1=media is full, no room to expand file
+*             2     0=fixed records
+*                   1=variable records
+*             3     0=data
+*                   1=program image
+*             4     0=Display format data
+*                   1=internal format data
+*             5     currently unused, always zero
+*             6     0=file is not protected against writes
+*                   1=file is protected against writes
+*             7     0=file exists
+*                   1=file does not exist
+*
+*           15      name length <byte count>
+*           16+     text of name
+*
+*
+*      BREAD        pab in         read sectors from any disk file
+*
+*      byte  0      0A
+*            1      -
+*            2      -
+*            3      \
+*            4       \
+*            5        \ buffer address
+*            6      \
+*            7       \ sector offset within file to begin read
+*            8      -
+*            9      -
+*           10      transfer flag, 0 is cpu, non-zero is VDP
+*           11      0
+*           12      \  number of sectors to read from file
+*           13       \ if zero, transfers files ID info into buffer
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*      BREAD        pab out
+*
+*      byte  0      -
+*            1      -
+*            2      error code
+*            3      \ updated to point to location in memory after the
+*            4       \ last byte successfully read from disk
+*            5        \
+*            6      \  (sector offset of last sector read)+1
+*            7       \ if read error, points to the bad sector
+*            8      -
+*            9      -
+*           10      -
+*           11      0
+*           12      \  count of number of sectors
+*           13       \ not read due to error condition
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+* @buffer is file ID info as follows:
+*
+*      byte:
+=           0,1     extended record length, used for files with records
+=                   longer than 255 bytes
+=           2       file status flags
+=
+= BIT:  Msb 7 6 5 4 3 2 1 0   MEANING
+=           | | | | | | | +-> 0-DATA 1-PROGRAM
+=           | | | | | | +---> 0-ASCII 1-BINARY
+=           | | | | | +-----> 2              RESERVED
+=           | | | | +-------> 3              0-NOT PROTECTED 1-PROTECTED
+=           | +-+-+---------> 4-6            RESERVED
+=           +---------------> 7              0-FIXED RECORD 1-VARIABLE LENGTH
+=
+=           3       number of records which can fit in a sector (256 bytes)
+=                   0 for program image, extended record lengths
+=           4,5     number of sectors reserved for file
+=           6       number of bytes used in last sector of file
+=                   (0 means all 256 are used)
+=           7       logical record length
+=                   0 for program image, extended record lengths
+=           8,9     (bytes reversed)
+=                   for fixed files, (highest used record number)+1
+=                   for program image, variable files, number of sectors
+=                   actually used
+=           10,11   date of creation     bits: yyyy yyyM MMMd dddd
+=           12,13   time of creation           hhhh hmmm mmms ssss
+=                                              seconds are / 2, with remainder
+=                                              discarded
+=           14,15   date of last change   "
+=           16,17   time of last change   "
+=
+*
+*
+*
+*      BWRITE       pab in         write sectors to any disk file
+*
+*      byte  0      0B
+*            1      -
+*            2      -
+*            3      \
+*            4       \
+*            5        \ buffer address
+*            6      \
+*            7       \ sector offset within file to begin write
+*            8      -
+*            9      -
+*           10      transfer flag, 0 is cpu, non-zero is VDP
+*           11      0
+*           12      \  number of sectors to write to file
+*           13       \ if zero, creates file with ID info from buffer
+*                     \ buffer info described in BREAD
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*      BWRITE       pab out
+*
+*      byte  0      -
+*            1      -
+*            2      error code
+*            3      \  points to location in memory after last byte
+*            4       \ successfully written to disk
+*            5        \
+*            6      \  (sector offset of last sector written)+1
+*            7       \ if write error, points to the bad sector
+*            8      -
+*            9      -
+*           10      -
+*           11      0
+*           12      \  count of number of sectors not
+*           13       \ written due to error condition
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*
+*      PROTECT      pab in         change file protection
+*
+*      byte  0      0C
+*            1      -
+*            2      protect flag, zero is unprotect file
+*                                 non-zero is protect file
+*            3      -
+*            4      -
+*            5      -
+*            6      -
+*            7      -
+*            8      -
+*            9      -
+*           10      -
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*      PROTECT      pab out
+*
+*      byte  0      -
+*            1      -
+*            2      error code
+*            3      -
+*            4      -
+*            5      -
+*            6      -
+*            7      -
+*            8      -
+*            9      -
+*           10      -
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*
+*      RENAME       pab in         rename a file
+*
+*      byte  0      0D
+*            1      -
+*            2      -
+*            3      \
+*            4       \
+*            5        \ buffer address
+*            6      -
+*            7      -
+*            8      -
+*            9      -
+*           10      transfer flag, 0 is cpu, non-zero is VDP
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of file to rename
+*
+* @buffer = new 10 character filename
+*
+*      RENAME       pab out
+*
+*      byte  0      -
+*            1      -
+*            2      error code
+*            3      -
+*            4      -
+*            5      -
+*            6      -
+*            7      -
+*            8      -
+*            9      -
+*           10      -
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*
+*      FORMAT       pab in         format a floppy diskette
+*
+*      byte  0      0E
+*            1      -
+*            2      -
+*            3      tracks per side
+*            4      skew between adjacent tracks
+*            5      interlace of individual tracks
+*            6      density  (2=double, other is single)
+*            7      number of sides to format 2=double, other is single
+*            8      -
+*            9      -
+*           10      -
+*           11      -
+*           12      -
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     physical drive spec, ie: "DSK1."
+*
+*      FORMAT       pab out
+*
+*      byte  0      -
+*            1      -
+*            2      error code
+*            3      -
+*            4      -
+*            5      -
+*            6      -
+*            7      -
+*            8      \
+*            9       \ total number of sectors formatted
+*           10      -
+*           11      number of sides formatted  (1,2)
+*           12      sectors per track
+*           13      -
+*           14      -
+*           15      name length <byte count>
+*           16+     text of name
+*
+*
+*      available devices under MDOS:
+*
+*      DSK1 \
+*      DSK2  \
+*      DSK3   \
+*      DSK4    \  floppy volumes
+*      DSK5       internal ramdisk
+*      DSK6       Horizons ramdisk at >1400 cru base
+*      DSK7       Horizons ramdisk at >1600 cru base
+*
+*      WDSx personality card winchester device
+*
+*      PIO   \
+*      PIO/1  \
+*      PIO/2   \  parallel printer spooler devices
+*
+*      RS232   \
+*      RS232/1  \
+*      RS232/2   \
+*      RS232/3    \
+*      RS232/4     \ serial port input and output spoolers
+*
+*      the following switch extensions may be used with the PIO ports
+*
+*      .CR  turn off cr/lf after each variable record sent
+*      .LF  turn off lf    after each variable record sent
+*      .NU  print nulls after each variable record to allow for a low
+*           slew-rate printer
+*      .IB  reconfigure the spooler to recognize a printer with an
+*           Inverted-Busy handshake signal
+*      .HS  reconfigure the spooler to perform a full handshake with
+*           the printer for each byte sent (instead of just strobe)
+*
+*
+*      the following switch extensions may be used with the RS232 ports
+*
+*      .CR  turn off cr/lf after each variable record sent
+*      .LF  turn off lf    after each variable record sent
+*      .NU  print nulls after each variable record to allow for a low
+*           slew-rate printer
+*      .BA=baudrate   (110,300,600,1200,2400,4800,9600,19200)
+*      .DA=databits   (7,8)
+*      .PA=O,E,N
+*      .TW  use two stopbits on transmission
+*      .CH  check parity
+*
+*      Note that none of the RS232 switches take effect unless they are
+*      found as a special record within spooler itself
+*
+*      The only way to place the switches into the spooler is to perform
+*      an OPEN call to the RS232 with the high bit of the flag byte set to 1
+*      ie: the first two bytes of the PAB could be >0080, which would append
+*      the switch record onto the end of the spooler, so as not to affect
+*      characters which may have been placed into the spooler while other
+*      switches may have been extant
+*

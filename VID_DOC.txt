@@ -1,0 +1,440 @@
+*
+* XOP 9 -- Low level video
+*
+*
+*
+* SetVideoMode                               op 0
+*
+* R1x = Video mode
+* R2l = Background color for cleared screen
+*
+* Video modes:
+*       0000    Text 1 mode
+*       0001    Text 2 mode
+*       0002    MultiColor mode
+*       0003    Graphic 1 mode
+*       0004    Graphic 2 mode
+*       0005    Graphic 3 mode
+*       0006    Graphic 4 mode
+*       0007    Graphic 5 mode
+*       0008    Graphic 6 mode
+*       0009    Graphic 7 mode
+*
+*
+* GetVideoMode                               op 1
+*
+* -----
+* R0x = Returned video mode
+* R1x = Number of columns
+* R2x = Number of rows
+*
+* SetCurPos                                  op 2
+*
+* R1x = Row number
+* R2x = Column number
+*
+* GetCurPos                                  op 3
+*
+* -----
+* R0x = Returned row number
+* R1x = Returned column number
+*
+* SetDisPage                                 op 4
+*
+* R1x = Page number
+*
+*
+* GetDisPage                                 op 5
+*
+* -----
+* R0x = Returned page number
+*
+* ScrollWinUp                                op 6
+*
+* R1x = Number of lines to scroll
+* R2x = Row number of upper left corner
+* R3x = Column number of upper left corner
+* R4x = Row number of lower right corner
+* R5x = Column number of lower right corner
+* R6x = Character value for blank lines
+* R7h = Foreground color for blank lines
+* R7l = Background color for blank lines
+*
+*
+* ScrollWinDown                              op 7
+*
+* R1x = Number of lines to scroll
+* R2x = Row number of upper left corner
+* R3x = Column number of upper left corner
+* R4x = Row number of lower right corner
+* R5x = Column number of lower right corner
+* R6x = Character value for blank lines
+* R7h = Foreground color for blank lines
+* R7l = Background color for blank lines
+*
+*
+* ScrollWinLeft                              op 08
+*
+* R1x = Number of lines to scroll
+* R2x = Row number of upper left corner
+* R3x = Column number of upper left corner
+* R4x = Row number of lower right corner
+* R5x = Column number of lower right corner
+* R6x = Character value for blank lines
+* R7h = Foreground color for blank lines
+* R7l = Background color for blank lines
+*
+*
+* ScrollWinRight                             op 09
+*
+* R1x = Number of lines to scroll
+* R2x = Row number of upper left corner
+* R3x = Column number of upper left corner
+* R4x = Row number of lower right corner
+* R5x = Column number of lower right corner
+* R6x = Character value for blank lines
+* R7h = Foreground color for blank lines
+* R7l = Background color for blank lines
+*
+*
+* WriteCharColor                             op 0a
+*
+* R1x = ASCII character to write to screen
+* R2h = Foreground color for character
+* R2l = Background color for character
+* R3x = Number of times to write character and color
+*
+*
+* GCharColor                                 op 0b
+*
+* R1x = Row
+* R2x = Col
+* -----
+* R0x = ASCII character read from screen
+* R1h = Foreground color for character
+* R1l = Background color for character
+*
+*
+* SetBorderColor                             op 0c
+*
+* R1x = Color to render border
+*
+* SetColPalette                              op 0d
+*
+* R1x = Palette register number
+* R2x = Color to put into palette register
+*
+* SetPixelColor                              op 0e
+*
+* R1x = X coordinate of pixel
+* R2x = Y coordinate of pixel
+* R3h = Foreground color to render pixel
+* R3l = Background color to render pixel in graphics 2-3
+*
+*
+* GetPixelColor                              op 0f
+*
+* R1x = X coordinate of pixel
+* R2x = Y coordinate of pixel
+* -----
+* R0h = Returned foreground color of pixel
+* R0l = Returned background color of pixel in graphics 2-3
+*
+*
+* SetVectorColor                             op 10
+*
+* R1x = X coordinate of first pixel
+* R2x = Y coordinate of first pixel
+* R3x = X coordinate of second pixel
+* R4x = Y coordinate of second pixel
+* R5h = Foreground color to render vector
+* R5l = Background color to render vector in graphics 2-3
+*
+*
+* ColorSRCH                                  op 11
+*
+* R1x = X coordinate of source point
+* R2x = Y coordinate of source point
+* R3l = Color for search
+* R3h = Direction for search (>00=LEFT, >FF=RIGHT)
+* -----
+* ST  = if EQUAL, color found
+* R0x = X coordinate of location where color was found
+* R1x = Y coordinate of location where color was found
+*
+* HBlockMove                                 op 12
+*
+* R1x = Row number of upper left corner of source
+* R2x = Column number of upper left corner of source
+* R3x = Row number of upper left corner of destination
+* R4x = Column number of upper left corner of destination
+* R5x = Number of rows
+* R6x = Number of columns
+* R7l = Pixel color for blank pixels
+*
+* HBlockCopy                                 op 13
+*
+* R1x = Row number of upper left corner of source
+* R2x = Column number of upper left corner of source
+* R3x = Row number of upper left corner of destination
+* R4x = Column number of upper left corner of destination
+* R5x = Number of rows
+* R6x = Number of columns
+*
+* LBlockMove                                 op 14
+*
+* R1x = Row number of upper left corner of source
+* R2x = Column number of upper left corner of source
+* R3x = Row number of upper left corner of destination
+* R4x = Column number of upper left corner of destination
+* R5x = Number of rows
+* R6x = Number of columns
+* R7l = Pixel color for blank pixels
+* R7h = Logic operation to be performed on destination
+*
+* LBlockCopy                                 op 15
+*
+* R1x = Row number of upper left corner of source
+* R2x = Column number of upper left corner of source
+* R3x = Row number of upper left corner of destination
+* R4x = Column number of upper left corner of destination
+* R5x = Number of rows
+* R6x = Number of columns
+* R7h = Logic operation to be performed on destination
+*
+* BScrollUp                                  op 16
+*
+* R1x = Number of pixels to scroll
+* R2x = Row number of upper left corner
+* R3x = Column number of upper left corner
+* R4x = Row number of lower right corner
+* R5x = Column number of lower right corner
+* R6h = Pixel color for blank pixels
+*
+* BScrollDown                                op 17
+*
+* R1x = Number of pixels to scroll
+* R2x = Row number of upper left corner
+* R3x = Column number of upper left corner
+* R4x = Row number of lower right corner
+* R5x = Column number of lower right corner
+* R6h = Pixel color for blank pixels
+*
+* BScrollLeft                                op 18
+*
+* R1x = Number of pixels to scroll
+* R2x = Row number of upper left corner
+* R3x = Column number of upper left corner
+* R4x = Row number of lower right corner
+* R5x = Column number of lower right corner
+* R6h = Pixel color for blank pixels
+*
+* BScrollRight                               op 19
+*
+* R1x = Number of pixels to scroll
+* R2x = Row number of upper left corner
+* R3x = Column number of upper left corner
+* R4x = Row number of lower right corner
+* R5x = Column number of lower right corner
+* R6h = Pixel color for blank pixels
+*
+* SpriteDef                                  op 1a
+*
+* R1x = Pointer to sprite data
+* R2x = # of sprites to define
+*
+* SpriteDel                                  op 1b
+*
+* R1x = Pointer to list of sprite #'s
+* R2x = # of sprites to delete (>FFFF for all)
+*
+* SpriteLocate                               op 1c
+*
+* R1x = Pointer to location data
+* R2x = # of sprites to locate
+*
+* SpriteMotion                               op 1d
+*
+* R1x = Pointer to motion data
+* R2x = # of sprites to put in motion
+*
+* SpriteColor                                op 1e
+*
+* R1x = Pointer to color data
+* R2x = # of sprites to color
+*
+* SpritePattern                              op 1f
+*
+* R1x = Pointer to pattern # data
+* R2x = # of sprites to pattern
+*
+* SpriteMagnify                              op 20
+*
+* R1x = MagFac (1-4, just like XB)
+*
+*
+* SpritePosition                             op 21
+*
+* R1x = # of sprite to get position of
+* -----
+* R0x = Returned Row of sprite
+* R1x = Returned Column of sprite
+*
+* SpriteCoinc                                op 22
+*
+* R1x = Type (0=sprites, 1=locations, 2=any two sprites)
+* R2x = # of coincidence checks
+* R3x = Pointer to test field
+* R4x = Pointer to result field
+* -----
+* R0x = # of coincidences detected
+*
+*
+* SpritePatDefGet                            op 23
+*
+* R1x = CPU address of sprite pattern definitions
+* R2x = # of sprite patterns to define or get
+* R3x = Starting pattern #
+* R4x = 0 if Def, >FFFF if Get
+*
+* CharPatDefGet                              op 24
+*
+* R1x = CPU address of character pattern definitions
+* R2x = # of character patterns to define or get
+* R3x = Starting pattern #
+* R4x = 0 if Def, >FFFF if Get
+*
+*
+* SetTextWindow                              op 25
+*
+* R1x = Top row
+* R2x = Left column
+* R3x = Bottom row
+* R4x = Right column
+*
+* GetTextWindow                              op 26
+*
+* -----
+* R0x = Returned top row
+* R1x = Returned left column
+* R2x = Returned bottom row
+* R3x = Returned right column
+*
+* WriteTTY                                   op 27
+*
+* R1x = CPU address of string
+* R2x = # of characters in string (0=NULL terminated)
+*
+*
+* RestoreCharacters                          op 28
+*
+* R1x = Address of character defs (0 for resident set)
+* R2x = Starting character number
+* R3x = Ending character number
+*
+*
+* SetTextColor                               op 29
+*
+* R1h = Foreground color for text
+* R1l = Background color for text
+*
+* WriteCharString                            op 2a
+*
+* R1x = Address of string
+* R2x = # of characters in string
+* R3x = 0 if change cursor position, >FFFF if leave cursor at beginning
+*
+*
+* PrintScreen                                op 2b
+*
+* HCharColor                                 op 2c
+*
+* R1x = Row
+* R2x = Col
+* R3x = ASCII character to write to screen
+* R4x = Number of times to write character and color
+* R5h = Foreground color for character
+* R5l = Background color for character
+*
+*
+* VCharColor                                 op 2d
+*
+* R1x = Row
+* R2x = Col
+* R3x = ASCII character to write to screen
+* R4x = Number of times to write character and color
+* R5h = Foreground color for character
+* R5l = Background color for character
+*
+*
+* HChar                                      op 2e
+*
+* R1x = Row
+* R2x = Col
+* R3x = ASCII character to write to screen
+* R4x = Number of times to write character and color
+*
+* VChar                                      op 2f
+*
+* R1x = Row
+* R2x = Col
+* R3x = ASCII character to write to screen
+* R4x = Number of times to write character and color
+*
+*
+* SetMouse                                   op 30
+*
+* R1x = new Xposition for mouse
+* R2x = new Yposition for mouse
+* R3x = scale factor for mouse speed  (0 to 7) 0=fastest
+* -----
+*
+*
+* GetMouse                                   op 31
+*
+* -----
+* R1x = Returned Xposition for mouse
+* R2x = Returned Yposition for mouse
+* R3x = b1 b2 b3 0 xxxx xxxx xxxx   (highest bits)
+*       \          b1= left   1=down
+*          \       b2= middle 1=down
+*             \    b3= right  1=down
+*
+*
+*
+* GetMouseRel                                op 32
+*
+* -----
+* R1x = Returned X displacement since last call to GetMouse or GetMouseRel
+* R2x = Returned Y displacement since last call to GetMouse or GetMouseRel
+* R3x = b1 b2 b3 0 xxxx xxxx xxxx   (highest bits)
+*       \          b1= left   1=down
+*          \       b2= middle 1=down
+*             \    b3= right  1=down
+*
+*
+* MakeSound                                  op 33
+*
+* R1x = Generator 1 frequency in Hz
+* R2x = Generator 2 frequency in Hz
+* R3x = Generator 3 frequency in Hz
+* R4h = Attenuation for Generator 1 (0-15)
+* R4l = Attenuation for Generator 2 (0-15)
+* R5h = Attenuation for Generator 3 (0-15)
+* R6h = control for noise generator: bits= 0000 0w t1 t2
+*                                                |  +--+-- 00= 6991 Hz
+*                                                |         01= 3496 Hz
+*                                                |         10= 1738 Hz
+*                                                |         11= same Hz as Gen #3
+*                                                +--------- 0= periodic noise
+*                                                           1= white noise
+* R6l = Attenuation for Noise Generator
+* R7x = duration of noise in 60th seconds
+* -----
+*
+*
+* SoundStatus                                op 34
+*
+* -----
+* EQ bit set if no sound is in progress
+*

@@ -1,0 +1,304 @@
+* 0N
+*              TI-Forth Loader for MDOS on Geneve 9640
+*                (c) Copyright 1989, Mike McCann (mjm)
+*
+*
+*  This source code is NOT being distributed as fairware/shareware etc.
+*  However, if you obtain this code without having paid the author
+*  the author would appreciate an acknowledgment of his time and effort
+*  by a $15 payment sent to:
+*
+*  Mike McCann
+*  c/o McCann Software
+*  P.O. Box 34160
+*  Omaha, NE 68134
+*
+*  Those who have paid the $15 are granted an unlimited license to use
+*  the source code in any product they may create.  The only exception is
+*  they may not sell this source code as if it were their own either as
+*  a product or as fairware/shareware.
+*
+*
+**************************************************************************
+*
+*
+*
+MAINWS EQU  >F060        FORTH WORKSPACE
+*
+       DXOP SYSC,0       SYSTEM CALL DEFINED
+*
+       LWPI MAINWS       LOAD FORTH WORKSPACE
+       B    @GOFTH       THIS IS WORK ENTRANCE
+LOADR  LI   R0,1         MEMORY PAGE ROUTINE
+       LI   R1,7         SEVEN NEW PAGES REQUESTED
+       MOV  R0,R2        LOCAL PAGE
+       SETO R3           REQUEST FAST RAM
+       SYSC @DOS7        DO SYSTEM CALL
+       JEQ  OKLOAD       OK?
+       BL   @TTY         BAIL OUT
+       DATA MERR,12
+       B    @EXIT
+*
+OKLOAD LI   R0,4         GET MAP ROUTINE
+       LI   R1,MMAP      TO MMAP
+       LI   R2,8         SIZE=8
+       SYSC @DOS7        DO SYSTEM CALL
+*
+       LI   R1,MMAP+1    ACTIVATE NEW PAGES
+*
+       MOVB *R1+,@>F111  >2000 - >3FFF
+       MOV  *R1+,@>F112  >4000 - >7FFF
+       MOV  *R1+,@>F114  >8000 - >BFFF
+       MOV  *R1,@>F116   >C000 - >FFFF
+*
+* ---------------------------------------------------------------------
+*
+*      this code sets both the forthimage and forthscrns to the
+*      currently selected drive.
+*
+*
+       LI   R2,FN             forthimage filename
+       BL   @DRV
+       MOVB @TEMPW,@FN        restore length byte from tempw
+       LI   R2,PDATA          forth i/o filename
+       BL   @DRV
+       MOVB @TEMPW,@PDATA     restore length byte from tempw
+       JMP  GO
+DRV    LI   R0,8              parse utility call parameter is 8
+       LI   R1,>F1B0          >F1B0 is work area
+       CLR  *R1               set 0 for default drive  (after jj in Mp)
+       CLR  R3                clear alias flag
+       MOVB *R2,@TEMPW        save the length byte in tempw
+       SYSC @DOS9             call the utility
+       JNE  EXIT
+       B    *R11
+*
+*      BRANCH TO AND START FORTH
+*
+GO     LI   R0,LPAB           point at loader pab
+       SYSC @DOS8
+       JNE  EXIT
+       B    @GOFTH
+*
+* ---------------------------------------------------------------------
+*
+EXIT   BLWP @0           EXIT TO MDOS
+*
+* MDOS TTY CALL
+*
+TTY    MOV  *R11+,R1     DATA ADDRESS
+       MOV  *R11+,R2     LENGTH
+       LI   R0,>0027     ROUTINE NUMBER
+       SYSC @DOS6        CALLING DOS
+       B    *R11
+*
+*
+DOS5   DATA 5            KEY XOP
+DOS6   DATA 6            VIDEO XOP
+DOS7   DATA 7            MEMORY MGR XOP
+DOS8   DATA 8            I/O  XOP
+DOS9   DATA 9            UTILITY XOP
+DOS10  DATA 10           MATH XOP
+*
+*
+MERR   TEXT 'MEMORY ERROR'
+       EVEN
+*
+* load pab
+*
+LPAB   DATA >0500,0,GOFTH,0,0,0,>C000    this is the image pab
+       BYTE >00
+FN     BYTE >0F
+       TEXT 'DSK1.FORTHIMAGE'
+       EVEN
+*
+* forth pab
+*
+FPAB   DATA >A00,0,0,0,0,0,4             this is the i/o pab. to change to
+       BYTE 0                            disk based boot change length byte
+PDATA  BYTE >F                      <--  to 5 but leave the rest for place
+       TEXT 'DSK1.FORTHSCRNS'            holders.
+       EVEN
+*
+TEMPW  BSS  2
+MMAP   BSS  8
+GOFTH  EQU  $
+*
+*      END
+*
+START  LWPI MAINWS            This points at the TI-Forth START
+       LI   TEMP1,UBASE0      load UBASE0 in TEMP1 to initialize
+       B    @FF9995           the user pointers.
+*
+*************************************************************************
+*
+*      THE PARAMETER STACK BASE IS AT >D800 GIVING ABOUT 44K DICTIONARY
+*      THE TIB WAS GIVEN A SEPARATE NAME AS WE TRIED SPBASE AT
+*      F05E ON CHIP RAM DIDN'T SEEM TO DO MUCH TO INCREASE SPEED
+*      ALSO MOVED RBASE THERE WITH SAME RESULTS
+*
+       DORG >D800
+*
+SPBASE BSS  0             BASE OF PARAM STACK
+$TIB   BSS  82            TIB
+$BUFF  BSS  5*>404        I/O BUFFERS
+$LO    BSS  0
+RBASE  EQU  >EFFE         BASE OF RETURN STACK
+*
+       RORG
+*
+*      new vdp utility addresses for Geneve 9640
+*
+VDPRD  EQU  >F100        VDP READ DATA
+VDPWD  EQU  >F100        VDP WRITE DATA
+VDPWA  EQU  >F102        VDP WRITE ADDRESS
+*
+*==============================================================
+*
+*** New General utility workspace registers *****)
+*
+UTILWS EQU  >F140             originally we had them on chip but
+XOPWS  EQU  >F160             they seem to work ok here.
+*
+*********** new MDOS utility vectors ******5/89 (mjm)
+*
+*
+KEYB   DATA XOPWS,KBX        USER KSCAN UTILITY
+VIDEO  DATA XOPWS,VIX        VIDEO UTILITY
+MEMRY  DATA XOPWS,MEX        MEMORY UTILITY
+DOIO   DATA XOPWS,IOX        I/O   UTILITY
+UTIL   DATA XOPWS,UTX        UTILITY  UTILITY
+MATH   DATA XOPWS,MTX        MATH  UTILITY
+*
+*
+*** MDOS CALL VECTORS *******5/89 (mjm)
+*
+KBU    BLWP @KEYB
+       B    @BKLINK
+VIU    BLWP @VIDEO
+       B    @BKLINK
+MEU    BLWP @MEMRY
+       B    @BKLINK
+IOU    BLWP @DOIO
+       B    @BKLINK
+UTU    BLWP @UTIL
+       B    @BKLINK
+MTU    BLWP @MATH
+       B    @BKLINK
+PDT    LI   TEMP0,PDATA
+       DECT SP
+       MOV  TEMP0,*SP
+       B    @BKLINK
+*
+*** MDOS EXECUTION BODIES ******5/89 (mjm)
+*
+KBX    SYSC @DOS5
+       STST R8
+       RTWP
+VIX    SYSC @DOS6
+       STST R8
+       RTWP
+MEX    SYSC @DOS7
+       STST R8
+       RTWP
+IOX    SYSC @DOS8
+       STST R8
+       RTWP
+UTX    SYSC @DOS9
+       STST R8
+       RTWP
+MTX    SYSC @DOS10
+       STST R8
+       RTWP
+*
+*===========================================================
+*     new keyboard scan utility for MDOS (5/89 mjm)
+*     kystat and kychar mimic old 99/4A locations
+*
+KYSTAT BSS  2
+KYCHAR BSS  2
+KPRES  DATA >2000
+*
+KSENTR CLR  @KYSTAT
+       CLR  R0
+       SYSC @DOS5
+       JNE  KS1
+       MOV  @KPRES,@KYSTAT
+KS1    MOV  R1,@KYCHAR
+       RTWP
+*
+***************** New Diskette Routines ***************************
+*
+* UPON ENTRY TO DSK
+* R1=ROUTINE,  R2=BLOCK #,  R3=#B/BLK,  R4=BUFFADDR
+* UPON EXIT FROM DSK  R0 = ERROR FLAG  0=NONE 6=ERROR
+* also, you can check pabs error flag for cause of error
+*
+****** DRIVE SELECTION ROUTINE -18 *******
+*
+DRSEL  CLR  TEMP0                         these 6 lines directly from
+DRV1   DEC  TEMP2                         ti forth original code.
+       JLT  DRV2
+       A    @$DKSIZ(U),TEMP0
+       JMP  DRV1
+DRV2   B    @BKLINK
+*
+**********  DISK EVENTS *****5/89 (mjm)*******
+*
+* although we tried to retain the flavor of the original this
+* disk handling routine is mostly new uses fpab data in loader
+* space for either disk based or file based block access
+*
+*
+DSK    CI   TEMP1,-18
+       JEQ  DRSEL
+       MOV  @$PABS(U),TEMP5    MOVE DATA AT FPAB INTO PAB 1
+       LI   TEMP6,FPAB
+       LI   TEMP7,42
+PFLL   MOV  *TEMP6+,*TEMP5+
+       DECT TEMP7
+       JNE  PFLL
+       MOV  @$PABS(U),TEMP7    GET PABADDR
+       MOV  TEMP4,@4(TEMP7)   MOVE BUFF. ADDR INTO PAB
+*
+******* COMPUTE SECTOR#,DRIVE# *******
+*
+       MOV  TEMP2,TEMP5
+       CLR  TEMP4
+       DIV  @$DKSIZ(U),TEMP4   WHICH DRIVE IS BLOCK IN R2 ON?
+       SWPB TEMP4             IN HI BYTE
+       MOV  @$PABS(U),TEMP7   GET PAB ADDR
+       AB   TEMP4,@19(TEMP7)  ADD OFFSET TO DRIVE NUMBER
+       SLA  TEMP5,2           BLOCK# * 4=SECTOR#
+       CI   TEMP3,1024        CHECK FOR BLOCK OR FLOAD                  ****
+       JEQ  GDSK                                                        ****
+       INC  TEMP5             WE DIDN'T USE THE 0 SECTOR ON FLOADS      ****
+       MOV  TEMP3,@12(TEMP7)  NUMBER OF SECTORS TO READ IN FLOAD        ****
+GDSK   MOV  TEMP5,@6(TEMP7)   MOVE SECTOR # TO PAB
+*
+******* SET FOR READ OR WRITE ********
+*
+       CI   TEMP1,-14         WRITE=-14
+       JNE  READD
+       LI   TEMP6,>0B00       SET FOR MDOS WRITE >0B00
+       C    TEMP2,@$DKFLO(U)  TRYING TO WRITE ON YOUR DIRECTORY?
+       JHE  CHKHI
+FERR   LI   TEMP0,>B
+       JMP  DXIT
+CHKHI  C    TEMP2,@$DKFHI(U)   TRYING TO WRITE YOUR NEIGHBOR'S DISK?
+       JHE  FERR
+       JMP  RW
+READD  LI   TEMP6,>0A00       SET FOR MDOS READ  >0A00
+*
+****** R/W **************
+*
+RW     MOV  TEMP6,*TEMP7      MOVE READ OR WRITE INST TO PAB
+       MOV  TEMP7,TEMP0       MOVE PAB ADDR TO R0 FOR SYSCALL
+       SYSC @DOS8
+       MOVB @2(TEMP7),TEMP0   CHECK FOR ERROR
+       JEQ  DSKDON
+       LI   TEMP0,6
+       JMP  DXIT
+DSKDON CLR  TEMP0
+DXIT   B    @BKLINK
+*

@@ -1,0 +1,662 @@
+*************** FORTH INNER INTERPRETER ***********
+*
+DODOES DECT SP
+       MOV  W,*SP
+       MOV  LINK,W
+DOCOL  DECT R
+       MOV  IP,*R
+       MOV  W,IP
+$NEXT  MOV  *IP+,W
+DOEXEC MOV  *W+,TEMP1
+       B    *TEMP1
+$SEMIS MOV  *R+,IP
+       MOV  *IP+,W
+       MOV  *W+,TEMP1
+       B    *TEMP1
+*
+*** EXECUTE ***
+       DATA >0
+L1000  DATA >8745,>5845,>4355,>54C5
+EXECUT DATA $+2
+       MOV  *SP+,W
+       B    @DOEXEC
+*
+*
+*** LIT ***
+       DATA L1000
+L1001  DATA >834C,>49D4
+LIT    DATA $+2
+       DECT SP
+       MOV  *IP+,*SP
+       B    *NEXT
+*
+*
+*** BRANCH ***
+       DATA L1001
+L1002  DATA >8642,>5241,>4E43,>48A0
+BRANCH DATA $+2
+BRAN2  A    *IP,IP
+       B    *NEXT
+*
+*
+*** 0BRANCH ***
+       DATA L1002
+L1003  DATA >8730,>4252,>414E,>43C8
+ZBRAN  DATA $+2
+       MOV  *SP+,TEMP1
+       JEQ  ZBRAN1
+       INCT IP
+       B    *NEXT
+ZBRAN1 A    *IP,IP
+       B    *NEXT
+*
+*
+*** (OF) ***
+       DATA L1003
+L1004  DATA >8428,>4F46,>29A0
+POF    DATA $+2
+       C    *SP+,*SP
+       JNE  POF1
+       INCT SP
+       INCT IP
+       B    *NEXT
+POF1   A    *IP,IP
+       B    *NEXT
+*
+*
+*** (LOOP) ***
+       DATA L1004
+L1005  DATA >8628,>4C4F,>4F50,>29A0
+PLOOP  DATA $+2
+       INC  *R
+       C    *R,@2(R)
+       JLT  PLOOPA
+       AI   R,4
+       INCT IP
+       B    *NEXT
+PLOOPA A    *IP,IP
+       B    *NEXT
+*
+*
+*** (+LOOP) ***
+       DATA L1005
+L1006  DATA >8728,>2B4C,>4F4F,>50A9
+PPLOOP DATA $+2
+       MOV  *SP+,TEMP1
+       A    TEMP1,*R
+       MOV  TEMP1,TEMP1
+       JLT  PLOOP2
+PLOOP1 C    *R,@2(R)
+       JLT  PLOOP3
+       AI   R,4
+       INCT IP
+       B    *NEXT
+PLOOP2 C    *R,@2(R)
+       JGT  PLOOP3
+       AI   R,4
+       INCT IP
+       B    *NEXT
+PLOOP3 A    *IP,IP
+       B    *NEXT
+*
+*
+*** (DO) ***
+       DATA L1006
+L1007  DATA >8428,>444F,>29A0
+PDO    DATA $+2
+       AI   R,-4
+       MOV  *SP+,*R
+       MOV  *SP+,@2(R)
+       B    *NEXT
+*
+*
+*** I ***
+       DATA L1007
+L1008  DATA >81C9
+I      DATA $+2
+       DECT SP
+       MOV  *R,*SP
+       B    *NEXT
+*
+*
+*** J ***
+       DATA L1008
+J1008  DATA >81CA
+J      DATA $+2
+       DECT SP
+       MOV  @4(R),*SP
+       B    *NEXT
+*
+*
+*** DIGIT ***
+       DATA J1008
+L1009  DATA >8544,>4947,>49D4
+DIGIT  DATA $+2
+       MOV  *SP+,TEMP1
+       MOV  *SP,TEMP2
+       AI   TEMP2,->0030
+       CI   TEMP2,10
+       JL   DIGIT1
+       AI   TEMP2,-7
+       CI   TEMP2,10
+       JHE  DIGIT1
+DIGIT2 CLR  *SP
+       B    *NEXT
+DIGIT1 C    TEMP2,TEMP1
+       JHE  DIGIT2
+       MOV  TEMP2,*SP
+       DECT  SP
+       SETO *SP
+       NEG  *SP
+       B    *NEXT
+*
+*
+*** (FIND) ***
+       DATA L1009
+L100A  DATA >8628,>4649,>4E44,>29A0
+PFIND  DATA $+2
+       MOV  *SP,TEMP1
+       JEQ  PFIND4
+PFIND1 MOV  TEMP1,TEMP2
+       MOV  @2(SP),TEMP3
+       MOVB *TEMP2+,W
+       ANDI W,>3F00
+       CB   W,*TEMP3+
+       JNE  PFIND3
+PFIND2 MOVB *TEMP2+,W
+       JLT  PFIND5
+       CB   W,*TEMP3+
+       JEQ  PFIND2
+PFIND3 MOV  @-2(TEMP1),TEMP1
+       JNE  PFIND1
+PFIND4 INCT SP
+       CLR  *SP
+       B    *NEXT
+PFIND5 ANDI W,>7F00
+       CB   W,*TEMP3
+       JNE  PFIND3
+       INCT TEMP2
+       MOV  TEMP2,@2(SP)
+       CLR  *SP
+       MOVB *TEMP1,@1(SP)
+       DECT SP
+       SETO *SP
+       NEG  *SP
+       B    *NEXT
+*
+*
+*** ENCLOSE ***
+       DATA L100A
+L100B  DATA >8745,>4E43,>4C4F,>53C5
+ENCLOS DATA $+2
+       MOV  *SP+,TEMP1
+       MOV  *SP,TEMP2
+       SWPB TEMP1
+       SETO TEMP3
+ENCL1  INC  TEMP3
+       CB   TEMP1,*TEMP2+
+       JEQ  ENCL1
+       DEC  TEMP2
+       AI   SP,-6
+       MOV  TEMP3,@4(SP)
+       MOV  TEMP3,*SP
+       INC  TEMP3
+       MOV  TEMP3,@2(SP)
+       MOVB *TEMP2,W
+       JNE  ENCL4
+       B    *NEXT
+ENCL4  INC  TEMP2
+ENCL2  MOV  TEMP3,@2(SP)
+       MOVB *TEMP2,W
+       JEQ  ENCL3
+       INC  TEMP3
+       CB   TEMP1,*TEMP2+
+       JNE  ENCL2
+ENCL3  MOV  TEMP3,*SP
+       B    *NEXT
+*
+*
+*** kEY ***
+       DATA L100B
+L100C  DATA >836B,>45D9
+KE     DATA $+2
+       LI   TEMP1,-2
+       MOV  @$SYS(U),LINK
+       BL   *LINK
+       DECT SP
+       MOV  TEMP0,*SP
+       B    *NEXT
+*
+*
+*** KEY ***
+       DATA L100C
+L100CX DATA >834B,>45D9
+KEY    DATA DOCOL,KE,LIT,>7F,AND,SEMIS
+*
+*
+*** KEY8 ***
+       DATA L100CX
+L100CY DATA >844B,>4559,>38A0
+KEY8   DATA DOCOL,KE,SEMIS
+*
+*
+*** EMIT ***
+       DATA L100CY
+L100D  DATA >8445,>4D49,>54A0
+EMIT   DATA $+2
+       MOV  *SP+,TEMP2
+       ANDI TEMP2,>007F
+       LI   TEMP1,-4
+       MOV  @$SYS(U),LINK
+       BL   *LINK
+       INC  @$OUT(U)
+       B    *NEXT
+*
+*
+*** EMIT8 ***
+       DATA L100D
+L100DX DATA >8545,>4D49,>54B8
+EMIT8  DATA $+2
+       MOV  *SP+,TEMP2
+       ANDI TEMP2,>00FF
+       LI   TEMP1,-4
+       MOV  @$SYS(U),LINK
+       BL   *LINK
+       INC  @$OUT(U)
+       B    *NEXT
+*
+*
+*** CR ***
+       DATA L100DX
+L100E  DATA >8243,>52A0
+CR     DATA $+2
+       LI   TEMP1,-6
+       MOV  @$SYS(U),LINK
+       BL   *LINK
+       B    *NEXT
+*
+*
+*** ?TERMINAL ***
+       DATA L100E
+L100F  DATA >893F,>5445,>524D,>494E,>41CC
+QTERM  DATA $+2
+       LI   TEMP1,-8
+       MOV  @$SYS(U),LINK
+       BL   *LINK
+       DECT SP
+       MOV  TEMP0,*SP
+       B    *NEXT
+*
+*
+*** ?KEY ***
+       DATA L100F
+L1010  DATA >843F,>4B45,>59A0
+QKEY   DATA $+2
+       LI   TEMP1,-10
+       MOV  @$SYS(U),LINK
+       BL   *LINK
+       ANDI TEMP0,>007F
+       DECT SP
+       MOV  TEMP0,*SP
+       B    *NEXT
+*
+*
+*** ?KEY8 ***
+       DATA L1010
+L1010X DATA >853F,>4B45,>59B8
+QKEY8  DATA $+2
+       LI   TEMP1,-10
+       MOV  @$SYS(U),LINK
+       BL   *LINK
+       ANDI TEMP0,>00FF
+       DECT SP
+       MOV  TEMP0,*SP
+       B    *NEXT
+*
+*
+*** GOTOXY ***
+       DATA L1010X
+L1011  DATA >8647,>4F54,>4F58,>59A0
+GOTOXY DATA $+2
+       MOV  *SP+,TEMP3
+       MOV  *SP+,TEMP2
+       LI   TEMP1,-12
+       MOV  @$SYS(U),LINK
+       BL   *LINK
+       B    *NEXT
+*
+*
+*** WDISK ***
+       DATA L1011
+L1012  DATA >8557,>4449,>53CB
+WDISK  DATA $+2
+       LI   TEMP1,-14
+       MOV  *SP+,TEMP3
+       MOV  *SP+,TEMP2
+       MOV  *SP,TEMP4
+       MOV  @$SYS(U),LINK
+       BL   *LINK
+       MOV  TEMP0,*SP
+       B    *NEXT
+*
+*
+*** RDISK ***
+       DATA L1012
+L1013  DATA >8552,>4449,>53CB
+RDISK  DATA $+2
+       LI   TEMP1,-16
+       MOV  *SP+,TEMP3
+       MOV  *SP+,TEMP2
+       MOV  *SP,TEMP4
+       MOV  @$SYS(U),LINK
+       BL   *LINK
+       MOV  TEMP0,*SP
+       B    *NEXT
+*
+*
+*** DRIVE ***
+       DATA L1013
+L1014  DATA >8544,>5249,>56C5
+DRIVE  DATA $+2
+       MOV  *SP+,TEMP2
+       LI   TEMP1,-18
+       MOV  @$SYS(U),LINK
+       BL   *LINK
+       MOV  TEMP0,@$OFFST(U)
+       B    *NEXT
+*
+*
+*** CMOVE ***
+       DATA L1014
+L1015  DATA >8543,>4D4F,>56C5
+CMOVE  DATA $+2
+       MOV  *SP+,TEMP1
+       MOV  *SP+,TEMP2
+       MOV  *SP+,TEMP3
+       MOV  TEMP1,TEMP1
+       JEQ  CMOVE2
+CMOVE1 MOVB *TEMP3+,*TEMP2+
+       DEC  TEMP1
+       JNE  CMOVE1
+CMOVE2 B    *NEXT
+*
+*
+*** MOVE ***
+       DATA L1015
+A1000  DATA >844D,>4F56,>45A0
+MOVE   DATA $+2
+       MOV  *SP+,TEMP1
+       MOV  *SP+,TEMP2
+       MOV  *SP+,TEMP3
+       MOV  TEMP1,TEMP1
+       JEQ  MOVE2
+MOVE1  MOV  *TEMP3+,*TEMP2+
+       DEC  TEMP1
+       JNE  MOVE1
+MOVE2  B    *NEXT
+*
+*
+*** SWPB ***
+       DATA A1000
+A1001  DATA >8453,>5750,>42A0
+SWPB   DATA $+2
+       SWPB *SP
+       B    *NEXT
+*
+*
+*** SRL ***
+       DATA A1001
+A1002  DATA >8353,>52CC
+SRL    DATA $+2
+       MOV  *SP+,TEMP0
+       JEQ  SRLX
+       MOV  *SP,TEMP1
+       SRL  TEMP1,0
+       MOV  TEMP1,*SP
+SRLX   B    *NEXT
+*
+*
+*** SLA ***
+       DATA A1002
+A1003  DATA >8353,>4CC1
+SLA    DATA $+2
+       MOV  *SP+,TEMP0
+       JEQ  SLAX
+       MOV  *SP,TEMP1
+       SLA  TEMP1,0
+       MOV  TEMP1,*SP
+SLAX   B    *NEXT
+*
+*
+*** SRA ***
+       DATA A1003
+A1004  DATA >8353,>52C1
+SRA    DATA $+2
+       MOV  *SP+,TEMP0
+       JEQ  SRAX
+       MOV  *SP,TEMP1
+       SRA  TEMP1,0
+       MOV  TEMP1,*SP
+SRAX   B    *NEXT
+*
+*
+*** SRC ***
+       DATA A1004
+A1005  DATA >8353,>52C3
+SRC    DATA $+2
+       MOV  *SP+,TEMP0
+       MOV  *SP,TEMP1
+       SRC  TEMP1,0
+       MOV  TEMP1,*SP
+       B    *NEXT
+*
+*
+*** U* ***
+       DATA A1005
+L1016  DATA >8255,>2AA0
+MULT   DATA $+2
+       MOV  *SP+,TEMP2
+       MPY  *SP,TEMP2
+       MOV  TEMP3,*SP
+       DECT SP
+       MOV  TEMP2,*SP
+       B    *NEXT
+*
+*
+*** U/ ***
+       DATA L1016
+L1017  DATA >8255,>2FA0
+DIV    DATA $+2
+       MOV  @2(SP),TEMP2
+       MOV  @4(SP),TEMP3
+       DIV  *SP+,TEMP2
+       MOV  TEMP2,*SP
+       MOV  TEMP3,@2(SP)
+       B    *NEXT
+*
+*
+*** AND ***
+       DATA L1017
+L1018  DATA >8341,>4EC4
+AND    DATA $+2
+       INV  *SP
+       SZC  *SP+,*SP
+       B    *NEXT
+*
+*
+*** OR ***
+       DATA L1018
+L1019  DATA >824F,>52A0
+OR     DATA $+2
+       SOC  *SP+,*SP
+       B    *NEXT
+*
+*
+*** XOR ***
+       DATA L1019
+L101A  DATA >8358,>4FD2
+XOR    DATA $+2
+       MOV  *SP+,TEMP1
+       XOR  *SP,TEMP1
+       MOV  TEMP1,*SP
+       B    *NEXT
+*
+*
+*** SP@ ***
+       DATA L101A
+L101B  DATA >8353,>50C0
+SPAT   DATA $+2
+       DECT SP
+       MOV  SP,*SP
+       INCT *SP
+       B    *NEXT
+*
+*
+*** SP! ***
+       DATA L101B
+L101C  DATA >8353,>50A1
+SPSTOR DATA $+2
+       MOV  @$S0(U),SP
+       B    *NEXT
+*
+*
+*** RP! ***
+       DATA L101C
+L101D  DATA >8352,>50A1
+RSTOR  DATA $+2
+       MOV  @$R0(U),R
+       B    *NEXT
+*
+*
+*** ;S ***
+       DATA L101D
+L101E  DATA >823B,>53A0
+SEMIS  DATA $SEMIS
+*
+*
+*** LEAVE ***
+       DATA L101E
+L101F  DATA >854C,>4541,>56C5
+LEAVE  DATA $+2
+       MOV  *R,@2(R)
+       B    *NEXT
+*
+*
+*** >R ***
+       DATA L101F
+L1020  DATA >823E,>52A0
+TOR    DATA $+2
+       DECT R
+       MOV  *SP+,*R
+       B    *NEXT
+*
+*
+*** R> ***
+       DATA L1020
+L1021  DATA >8252,>3EA0
+FROMR  DATA $+2
+       DECT SP
+       MOV  *R+,*SP
+       B    *NEXT
+*
+*
+*** R ***
+       DATA L1021
+L1022  DATA >81D2
+RR     DATA $+2
+       DECT SP
+       MOV  *R,*SP
+       B    *NEXT
+*
+*
+*** U ***
+       DATA L1022
+L1023  DATA >81D5
+UU     DATA $+2
+       DECT SP
+       MOV  U,*SP
+       B    *NEXT
+*
+*
+*** 0= ***
+       DATA L1023
+L1024  DATA >8230,>3DA0
+ZEQU   DATA $+2
+       MOV  *SP,TEMP1
+       JEQ  ZEQUTR
+       CLR  *SP
+       B    *NEXT
+ZEQUTR SETO *SP
+       NEG  *SP
+       B    *NEXT
+*
+*
+*** 0< ***
+       DATA L1024
+L1025  DATA >8230,>3CA0
+ZLESS  DATA $+2
+       MOV  *SP,TEMP1
+       JLT  PUSHTR
+PUSHFL CLR  *SP
+       B    *NEXT
+PUSHTR SETO *SP
+       NEG  *SP
+       B    *NEXT
+*
+*
+*** + ***
+       DATA L1025
+L1026  DATA >81AB
+PLUS   DATA $+2
+       A    *SP+,*SP
+       B    *NEXT
+*
+*
+*** D+ ***
+       DATA L1026
+L1027  DATA >8244,>2BA0
+DPLUS  DATA $+2
+       A    *SP+,@2(SP)
+       A    *SP+,@2(SP)
+       JNC  DPLUS1
+       INC  *SP
+DPLUS1 B    *NEXT
+*
+*
+*** MINUS ***
+       DATA L1027
+L1028  DATA >854D,>494E,>55D3
+MINUS  DATA $+2
+       NEG  *SP
+       B    *NEXT
+*
+*
+*** DMINUS ***
+       DATA L1028
+L1029  DATA >8644,>4D49,>4E55,>53A0
+DMINUS DATA $+2
+       INV  @2(SP)
+       INV  *SP
+       INC  @2(SP)
+       JNC  DM1
+       INC  *SP
+DM1    B    *NEXT
+*
+*
+*** OVER ***
+       DATA L1029
+L102A  DATA >844F,>5645,>52A0
+OVER   DATA $+2
+       DECT SP
+       MOV  @4(SP),*SP
+       B    *NEXT
+*
+*
+*** DROP ***
+       DATA L102A
+L102B  DATA >8444,>524F,>50A0
+DROP   DATA $+2
+       INCT SP
+       B    *NEXT
+*
+*
